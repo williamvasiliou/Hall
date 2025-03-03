@@ -31,4 +31,29 @@ void Inventory::commit() {
 	}
 }
 
+std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
+	out << "Inventory:" << std::endl;
+
+	for (size_t i = 0; i < size; ++i) {
+		const Items::Item item = Items::item[i];
+		const double inventoryIn = inventory.in[i];
+		const double inventoryOut = inventory.out[i];
+
+		out << "\t" << item.name << ": " << inventoryIn;
+
+		if (inventoryIn != inventoryOut) {
+			out << " to " << inventoryOut;
+		}
+
+		if (item.rate > 0.0) {
+			out << " (" << item.rate << "/T)" << std::endl;
+		} else {
+			out << std::endl;
+		}
+	}
+
+	out << std::endl;
+	return out;
+}
+
 Inventory::~Inventory() {}

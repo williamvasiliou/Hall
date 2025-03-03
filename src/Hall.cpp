@@ -7,13 +7,18 @@ bool good(const Inventory& inventory, const std::vector<Trade>& trades) {
 		return false;
 	}
 
-	std::string previous = Items::item[0].name;
+	std::string previous;
+	Items::remove_copy_if(0, previous);
+
 	for (size_t i = 1; i < size; ++i) {
-		if (Items::item[i].name <= previous) {
+		std::string next;
+		Items::remove_copy_if(i, next);
+
+		if (next <= previous) {
 			return false;
 		}
 
-		previous = Items::item[i].name;
+		previous = next;
 	}
 
 	for (size_t i = 0; i < size; ++i) {
@@ -27,7 +32,7 @@ bool good(const Inventory& inventory, const std::vector<Trade>& trades) {
 	for (auto& trade : trades) {
 		auto& in = trade.getIn();
 		auto& out = trade.getOut();
-		bool keys[size] {};
+		std::vector<bool> keys(size, false);
 
 		if (in.size() <= 0 || out.size() <= 0) {
 			return false;
@@ -60,7 +65,7 @@ bool good(const Inventory& inventory, const std::vector<Trade>& trades) {
 	return true;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
 	Inventory inventory;
 	std::vector<Trade> trades(24);
 
@@ -136,12 +141,19 @@ int main(int argc, char *argv[]) {
 	trades[23].setIn(15, {1.0, 0.0});
 	trades[23].setOut(6, 5.0);
 
+	std::cout << inventory;
+	for (auto& trade : trades) {
+		std::cout << trade;
+	}
+
 	if (good(inventory, trades)) {
 		for (auto& trade : trades) {
 			trade.on(inventory);
 		}
 
 		inventory.commit();
+
+		std::cout << inventory;
 	}
 
 	return 0;

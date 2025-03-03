@@ -1,4 +1,5 @@
 #ifndef TRADE_ROW_H
+#define TRADE_ROW_H
 
 class TradeRow {
 	public:

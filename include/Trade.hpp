@@ -17,6 +17,8 @@ class Trade {
 
 		void on(Inventory& inventory) const;
 
+		friend std::ostream& operator<<(std::ostream& out, const Trade& trade);
+
 		~Trade();
 
 	private:

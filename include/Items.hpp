@@ -1,7 +1,9 @@
 #ifndef ITEMS_H
 #define ITEMS_H
 
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <string>
 
 namespace Items {
@@ -39,6 +41,15 @@ namespace Items {
 		{"tube_coran_fan", 0.0},
 		{"water_bucket", 0.0},
 	};
+
+	template <typename T>
+	void remove_copy_if(size_t i, T& result) {
+		if (i < size) {
+			const std::string& name = item[i].name;
+
+			std::remove_copy_if(name.begin(), name.end(), std::back_inserter(result), [](char c){ return c == '_'; });
+		}
+	}
 }
 
 #endif // ITEMS_H

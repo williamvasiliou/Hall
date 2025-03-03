@@ -1,6 +1,7 @@
 #ifndef INVENTORY_H
 #define INVENTORY_H
 
+#include <iostream>
 #include "Items.hpp"
 using Items::size;
 
@@ -15,6 +16,7 @@ class Inventory {
 		void remove(size_t i, double amount);
 
 		void commit();
+		friend std::ostream& operator<<(std::ostream& out, const Inventory& inventory);
 
 		~Inventory();
 
