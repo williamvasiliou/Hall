@@ -52,7 +52,6 @@ std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
 		}
 	}
 
-	out << std::endl;
 	return out;
 }
 
