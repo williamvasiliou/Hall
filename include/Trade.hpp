@@ -11,6 +11,7 @@ class Trade {
 
 		const std::unordered_map<size_t, TradeRow>& getIn() const;
 		void setIn(size_t i, const TradeRow& row);
+		void setWeight(size_t i, double weight);
 
 		const std::unordered_map<size_t, double>& getOut() const;
 		void setOut(size_t i, double amount);

@@ -1,6 +1,16 @@
 #include "Trade.hpp"
 #include <iostream>
+#include <random>
 #include <vector>
+
+static const size_t population = 100;
+static const size_t weights = population * Items::trades;
+
+static double weight[weights] {};
+
+static std::random_device rd;
+static std::mt19937 gen(rd());
+static std::uniform_real_distribution<> dis(0.0, 1.0);
 
 bool good(const Inventory& inventory, const std::vector<Trade>& trades) {
 	if (size <= 0) {
@@ -93,6 +103,53 @@ bool good(const Inventory& inventory, const std::vector<Trade>& trades) {
 	}
 
 	return true;
+}
+
+void setWeights(double *weights) {
+	for (size_t i = 0; i < size; ++i) {
+		const size_t index = Items::item[i].index;
+		const size_t size = Items::item[i].size;
+		const size_t end = index + size;
+
+		if (size > 0 && end <= Items::trades) {
+			double sum = 0.0;
+
+			for (size_t j = index; j < end; ++j) {
+				const double weight = dis(gen);
+
+				weights[j] = weight;
+				sum += weight;
+			}
+
+			if (sum > 0.001) {
+				sum = dis(gen) / sum;
+
+				for (size_t j = index; j < end; ++j) {
+					weights[j] *= sum;
+				}
+			} else {
+				sum = dis(gen);
+
+				for (size_t j = index; j < end; ++j) {
+					weights[j] *= sum;
+				}
+			}
+		}
+	}
+}
+
+void setWeights(std::vector<Trade>& trades, double *weights) {
+	for (size_t i = 0; i < size; ++i) {
+		const size_t index = Items::item[i].index;
+		const size_t size = Items::item[i].size;
+		const size_t end = index + size;
+
+		if (size > 0 && end <= Items::trades) {
+			for (size_t j = index; j < end; ++j) {
+				trades[Items::trade[j]].setWeight(i, weights[j]);
+			}
+		}
+	}
 }
 
 int main() {
@@ -7938,14 +7995,25 @@ int main() {
 		std::cout << trade << std::endl;
 	}
 
+	for (size_t i = 0; i < population; ++i) {
+		setWeights(weight + (i * Items::trades));
+	}
+
 	if (good(inventory, trades)) {
-		for (auto& trade : trades) {
-			trade.on(inventory);
+		for (size_t i = 0; i < population; ++i) {
+			setWeights(trades, weight + (i * Items::trades));
+
+			inventory.restore();
+			for (size_t j = 0; j < 1000; ++j) {
+				for (auto& trade : trades) {
+					trade.on(inventory);
+				}
+
+				inventory.commit();
+			}
+
+			std::cout << std::endl << inventory << std::endl;
 		}
-
-		inventory.commit();
-
-		std::cout << std::endl << inventory << std::endl;
 	}
 
 	return 0;

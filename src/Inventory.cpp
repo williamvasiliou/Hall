@@ -31,6 +31,13 @@ void Inventory::commit() {
 	}
 }
 
+void Inventory::restore() {
+	for (size_t i = 0; i < size; ++i) {
+		this->in[i] = 0.0;
+		this->out[i] = 0.0;
+	}
+}
+
 std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
 	out << "Inventory:" << std::endl;
 

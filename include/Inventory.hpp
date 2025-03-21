@@ -16,6 +16,8 @@ class Inventory {
 		void remove(size_t i, double amount);
 
 		void commit();
+		void restore();
+
 		friend std::ostream& operator<<(std::ostream& out, const Inventory& inventory);
 
 		~Inventory();

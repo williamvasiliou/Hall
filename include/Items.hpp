@@ -2060,7 +2060,9 @@ namespace Items {
 		static const size_t yellow_wool = 1018;
 	} // namespace minecraft
 
-	static const size_t trades[2784] = {
+	static const size_t trades = 2784;
+
+	static const size_t trade[trades] = {
 		0, 22, 65, 234, 324, 572, 573, 574, 575, 576, 577, 578, 579, 580, 581, 582,
 		583, 584, 585, 586, 587, 633, 838, 1485, 1486, 1772, 1, 2, 3, 4, 6, 7, 8,
 		11, 12, 13, 14, 15, 16, 17, 21, 23, 24, 30, 32, 34, 35, 36, 37, 38, 40,

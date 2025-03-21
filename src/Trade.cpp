@@ -10,6 +10,10 @@ void Trade::setIn(size_t i, const TradeRow& row) {
 	this->in[i] = row;
 }
 
+void Trade::setWeight(size_t i, double weight) {
+	this->in[i].weight = weight;
+}
+
 const std::unordered_map<size_t, double>& Trade::getOut() const {
 	return this->out;
 }
