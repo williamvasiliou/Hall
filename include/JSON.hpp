@@ -2,6 +2,7 @@
 #define JSON_H
 
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -136,11 +137,9 @@ namespace JSON {
 			const double number;
 
 			virtual std::string stringify() const {
-				static const size_t size = 24;
-				char str[size] {};
-				snprintf(str, size, "%f", this->number);
-
-				return std::string(str);
+				std::ostringstream string;
+				string << this->number;
+				return string.str();
 			}
 
 			virtual ~Number() {}
@@ -183,6 +182,16 @@ namespace JSON {
 			{}
 
 			const std::string string;
+
+			static std::string fromCodePoint(uint16_t point) {
+				if (point <= 0x7F) {
+					return std::string(1, (char) point);
+				} else if (point <= 0x7FF) {
+					return std::string(1, (char) (0xC0 | ((point >> 6) & 0x1F))) + std::string(1, (char) (0x80 | (point & 0x3F)));
+				} else {
+					return std::string(1, (char) (0xE0 | ((point >> 12) & 0x0F))) + std::string(1, (char) (0x80 | ((point >> 6) & 0x3F))) + std::string(1, (char) (0x80 | (point & 0x3F)));
+				}
+			}
 
 			virtual std::string stringify() const {
 				return quote(this->string);
@@ -287,10 +296,6 @@ namespace JSON {
 		return 0;
 	}
 
-	static uint16_t point(char a, char b, char c, char d) {
-		return hexdigit(a) << 12 | hexdigit(b) << 8 | hexdigit(c) << 4 | hexdigit(d);
-	}
-
 	static size_t string(Any **value, const std::string& input, size_t index, size_t size) {
 		size_t i = index;
 		if (i < size && input[i] == '"') {
@@ -332,7 +337,7 @@ namespace JSON {
 										isxdigit(input[i + 2]) &&
 										isxdigit(input[i + 3]) &&
 										isxdigit(input[i + 4])) {
-										str += point(input[i + 1], input[i + 2], input[i + 3], input[i + 4]);
+										str += String::fromCodePoint(hexdigit(input[i + 1]) << 12 | hexdigit(input[i + 2]) << 8 | hexdigit(input[i + 3]) << 4 | hexdigit(input[i + 4]));
 										i += 4;
 									} else {
 										return index;
