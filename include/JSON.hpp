@@ -8,16 +8,35 @@
 #include <vector>
 
 namespace JSON {
+	static const uint8_t TYPE_ARRAY = 1;
+	static const uint8_t TYPE_BOOLEAN = 2;
+	static const uint8_t TYPE_NULL = 3;
+	static const uint8_t TYPE_NUMBER = 4;
+	static const uint8_t TYPE_OBJECT = 5;
+	static const uint8_t TYPE_STRING = 6;
+
 	class Any {
 		public:
-			virtual ~Any() {}
+			virtual inline const uint8_t& is() const noexcept = 0;
 
-			virtual std::string stringify() const = 0;
+			virtual std::ostream& stringify(std::ostream& out) const = 0;
 			friend std::ostream& operator<<(std::ostream& out, const Any& value);
+
+			virtual ~Any() {}
 
 		protected:
 			explicit Any() {}
 	};
+
+	static inline std::string stringify(const Any& value) {
+		std::ostringstream out;
+		value.stringify(out);
+		return out.str();
+	}
+
+	std::ostream& operator<<(std::ostream& out, const Any& value) {
+		return value.stringify(out);
+	}
 
 	static std::string quote(const std::string& string) {
 		std::string quote = "\"";
@@ -71,22 +90,57 @@ namespace JSON {
 		public:
 			explicit Array() {}
 
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_ARRAY;
+			}
+
+			static Array *is(const Any *const& value) {
+				if (value && value->is() == TYPE_ARRAY) {
+					return (Array *) value;
+				} else {
+					return (Array *) nullptr;
+				}
+			}
+
 			std::vector<Any *> array;
 
-			virtual std::string stringify() const {
-				std::string value(1, STRUCTURAL::BEGIN_ARRAY);
+			Any *& operator[](size_t i) noexcept {
+				return this->array[i];
+			}
+
+			const Any *const& operator[](size_t i) const noexcept {
+				return this->array[i];
+			}
+
+			void push(Any *const& value) {
+				this->array.push_back(value);
+			}
+
+			size_t size() const noexcept {
+				return this->array.size();
+			}
+
+			virtual std::ostream& stringify(std::ostream& out) const {
+				out << std::string(1, STRUCTURAL::BEGIN_ARRAY);
 
 				const size_t size = this->array.size();
 				if (size > 0) {
-					value += this->array[0]->stringify();
+					Any *value = this->array[0];
+					if (value) {
+						value->stringify(out);
+					}
 
 					for (size_t i = 1; i < size; ++i) {
-						value += std::string(1, STRUCTURAL::VALUE_SEPARATOR) + " " + this->array[i]->stringify();
+						out << std::string(1, STRUCTURAL::VALUE_SEPARATOR) << " ";
+						value = this->array[i];
+						if (value) {
+							value->stringify(out);
+						}
 					}
 				}
 
-				value += std::string(1, STRUCTURAL::END_ARRAY);
-				return value;
+				out << std::string(1, STRUCTURAL::END_ARRAY);
+				return out;
 			}
 
 			virtual ~Array() {
@@ -104,14 +158,28 @@ namespace JSON {
 				boolean(boolean)
 			{}
 
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_BOOLEAN;
+			}
+
+			static Boolean *is(const Any *const& value) {
+				if (value && value->is() == TYPE_BOOLEAN) {
+					return (Boolean *) value;
+				} else {
+					return (Boolean *) nullptr;
+				}
+			}
+
 			const bool boolean;
 
-			virtual std::string stringify() const {
+			virtual std::ostream& stringify(std::ostream& out) const {
 				if (this->boolean) {
-					return "true";
+					out << "true";
 				} else {
-					return "false";
+					out << "false";
 				}
+
+				return out;
 			}
 
 			virtual ~Boolean() {}
@@ -121,8 +189,21 @@ namespace JSON {
 		public:
 			explicit Null() {}
 
-			virtual std::string stringify() const {
-				return "null";
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_NULL;
+			}
+
+			static Null *is(const Any *const& value) {
+				if (value && value->is() == TYPE_NULL) {
+					return (Null *) value;
+				} else {
+					return (Null *) nullptr;
+				}
+			}
+
+			virtual std::ostream& stringify(std::ostream& out) const {
+				out << "null";
+				return out;
 			}
 
 			virtual ~Null() {}
@@ -134,12 +215,23 @@ namespace JSON {
 				number(number)
 			{}
 
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_NUMBER;
+			}
+
+			static Number *is(const Any *const& value) {
+				if (value && value->is() == TYPE_NUMBER) {
+					return (Number *) value;
+				} else {
+					return (Number *) nullptr;
+				}
+			}
+
 			const double number;
 
-			virtual std::string stringify() const {
-				std::ostringstream string;
-				string << this->number;
-				return string.str();
+			virtual std::ostream& stringify(std::ostream& out) const {
+				out << this->number;
+				return out;
 			}
 
 			virtual ~Number() {}
@@ -149,23 +241,46 @@ namespace JSON {
 		public:
 			explicit Object() {}
 
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_OBJECT;
+			}
+
+			static Object *is(const Any *const& value) {
+				if (value && value->is() == TYPE_OBJECT) {
+					return (Object *) value;
+				} else {
+					return (Object *) nullptr;
+				}
+			}
+
 			std::unordered_map<std::string, Any *> object;
 
-			virtual std::string stringify() const {
-				std::string value(1, STRUCTURAL::BEGIN_OBJECT);
+			Any *& operator[](const std::string& name) {
+				return this->object[name];
+			}
+
+			const Any *const& operator[](const std::string& name) const {
+				return this->object.at(name);
+			}
+
+			virtual std::ostream& stringify(std::ostream& out) const {
+				out << std::string(1, STRUCTURAL::BEGIN_OBJECT);
 				bool rest = false;
 
 				for (const std::pair<const std::string, Any *>& pair : this->object) {
 					if (rest) {
-						value += std::string(1, STRUCTURAL::VALUE_SEPARATOR) + " ";
+						out << std::string(1, STRUCTURAL::VALUE_SEPARATOR) << " ";
 					}
 
-					value += quote(pair.first) + std::string(1, STRUCTURAL::NAME_SEPARATOR) + " " + pair.second->stringify();
+					out << quote(pair.first) << std::string(1, STRUCTURAL::NAME_SEPARATOR) << " ";
+					if (pair.second) {
+						pair.second->stringify(out);
+					}
 					rest = true;
 				}
 
-				value += std::string(1, STRUCTURAL::END_OBJECT);
-				return value;
+				out << std::string(1, STRUCTURAL::END_OBJECT);
+				return out;
 			}
 
 			virtual ~Object() {
@@ -181,6 +296,18 @@ namespace JSON {
 				string(string)
 			{}
 
+			virtual inline const uint8_t& is() const noexcept {
+				return TYPE_STRING;
+			}
+
+			static String *is(const Any *const& value) {
+				if (value && value->is() == TYPE_STRING) {
+					return (String *) value;
+				} else {
+					return (String *) nullptr;
+				}
+			}
+
 			const std::string string;
 
 			static std::string fromCodePoint(uint16_t point) {
@@ -193,21 +320,13 @@ namespace JSON {
 				}
 			}
 
-			virtual std::string stringify() const {
-				return quote(this->string);
+			virtual std::ostream& stringify(std::ostream& out) const {
+				out << quote(this->string);
+				return out;
 			}
 
 			virtual ~String() {}
 	};
-
-	static std::string stringify(const Any& value) {
-		return value.stringify();
-	}
-
-	std::ostream& operator<<(std::ostream& out, const Any& value) {
-		out << value.stringify();
-		return out;
-	}
 
 	static size_t parse(Any **value, const std::string& input, size_t index, size_t size);
 
@@ -391,15 +510,16 @@ namespace JSON {
 
 		if (c) {
 			Object *object = new Object();
+			auto& data = object->object;
 
-			String *name = (String *) NULL;
-			Any *element = (Any *) NULL;
+			String *name = (String *) nullptr;
+			Any *element = (Any *) nullptr;
 			next = member(&name, &element, input, next, size);
 			if (name && element) {
-				object->object[name->string] = element;
+				data[name->string] = element;
 			} else if (element) {
 				delete element;
-				element = (Any *) NULL;
+				element = (Any *) nullptr;
 			}
 
 			if (name) {
@@ -407,19 +527,21 @@ namespace JSON {
 			}
 
 			while (element) {
-				name = (String *) NULL;
-				element = (Any *) NULL;
+				name = (String *) nullptr;
+				element = (Any *) nullptr;
 
 				c = 0;
 				next = structural<STRUCTURAL::VALUE_SEPARATOR>(&c, input, next, size);
 				if (c) {
 					next = member(&name, &element, input, next, size);
 					if (name && element) {
-						if (object->object[name->string]) {
-							delete object->object[name->string];
+						const std::string& string = name->string;
+
+						if (data[string]) {
+							delete data[string];
 						}
 
-						object->object[name->string] = element;
+						data[string] = element;
 						delete name;
 					} else {
 						if (name) {
@@ -458,15 +580,16 @@ namespace JSON {
 
 		if (c) {
 			Array *array = new Array();
+			auto& data = array->array;
 
-			Any *element = (Any *) NULL;
+			Any *element = (Any *) nullptr;
 			next = parse(&element, input, next, size);
 			if (element) {
-				array->array.push_back(element);
+				data.push_back(element);
 			}
 
 			while (element) {
-				element = (Any *) NULL;
+				element = (Any *) nullptr;
 
 				c = 0;
 				next = structural<STRUCTURAL::VALUE_SEPARATOR>(&c, input, next, size);
@@ -474,7 +597,7 @@ namespace JSON {
 					next = parse(&element, input, next, size);
 
 					if (element) {
-						array->array.push_back(element);
+						data.push_back(element);
 					} else {
 						delete array;
 						return index;
@@ -621,7 +744,7 @@ namespace JSON {
 
 		next = digit(input, index, size);
 		if (next > index) {
-			return digits((size_t *) NULL, input, next, size);
+			return digits((size_t *) nullptr, input, next, size);
 		}
 
 		return index;
@@ -636,7 +759,7 @@ namespace JSON {
 				next = frac(input, next, size);
 				next = exp(input, next, size);
 				if (value) {
-					*value = new Number(std::strtod(input.data() + index, (char **) NULL));
+					*value = new Number(std::strtod(input.data() + index, (char **) nullptr));
 				}
 				return next;
 			}
@@ -647,7 +770,7 @@ namespace JSON {
 				next = frac(input, next, size);
 				next = exp(input, next, size);
 				if (value) {
-					*value = new Number(std::strtod(input.data() + index, (char **) NULL));
+					*value = new Number(std::strtod(input.data() + index, (char **) nullptr));
 				}
 				return next;
 			}
@@ -698,8 +821,19 @@ namespace JSON {
 		return index;
 	}
 
-	static size_t parse(Any **value, const std::string& input) {
-		return parse(value, input, 0, input.size());
+	static Any *parse(const std::string& input) {
+		const size_t size = input.size();
+		Any *value = (Any *) nullptr;
+
+		if (parse(&value, input, 0, size) == size) {
+			return value;
+		} else {
+			if (value) {
+				delete value;
+			}
+
+			return (Any *) nullptr;
+		}
 	}
 } // namespace JSON
 
