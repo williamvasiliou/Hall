@@ -8,35 +8,21 @@
 #include <vector>
 
 namespace JSON {
+	namespace STRUCTURAL {
+		static const char BEGIN_ARRAY = '[';
+		static const char BEGIN_OBJECT = '{';
+		static const char END_ARRAY = ']';
+		static const char END_OBJECT = '}';
+		static const char NAME_SEPARATOR = ':';
+		static const char VALUE_SEPARATOR = ',';
+	} // namespace STRUCTURAL
+
 	static const uint8_t TYPE_ARRAY = 1;
 	static const uint8_t TYPE_BOOLEAN = 2;
 	static const uint8_t TYPE_NULL = 3;
 	static const uint8_t TYPE_NUMBER = 4;
 	static const uint8_t TYPE_OBJECT = 5;
 	static const uint8_t TYPE_STRING = 6;
-
-	class Any {
-		public:
-			virtual inline const uint8_t& is() const noexcept = 0;
-
-			virtual std::ostream& stringify(std::ostream& out) const = 0;
-			friend std::ostream& operator<<(std::ostream& out, const Any& value);
-
-			virtual ~Any() {}
-
-		protected:
-			explicit Any() {}
-	};
-
-	static inline std::string stringify(const Any& value) {
-		std::ostringstream out;
-		value.stringify(out);
-		return out.str();
-	}
-
-	std::ostream& operator<<(std::ostream& out, const Any& value) {
-		return value.stringify(out);
-	}
 
 	static std::string quote(const std::string& string) {
 		std::string quote = "\"";
@@ -77,14 +63,18 @@ namespace JSON {
 		return quote;
 	}
 
-	namespace STRUCTURAL {
-		static const char BEGIN_ARRAY = '[';
-		static const char BEGIN_OBJECT = '{';
-		static const char END_ARRAY = ']';
-		static const char END_OBJECT = '}';
-		static const char NAME_SEPARATOR = ':';
-		static const char VALUE_SEPARATOR = ',';
-	} // STRUCTURAL
+	class Any {
+		public:
+			virtual inline const uint8_t& is() const noexcept = 0;
+
+			virtual std::ostream& stringify(std::ostream& out) const = 0;
+			friend std::ostream& operator<<(std::ostream& out, const Any& value);
+
+			virtual ~Any() {}
+
+		protected:
+			explicit Any() {}
+	};
 
 	class Array : public Any {
 		public:
@@ -94,7 +84,7 @@ namespace JSON {
 				return TYPE_ARRAY;
 			}
 
-			static Array *is(const Any *const& value) {
+			static inline Array *is(const Any *const& value) {
 				if (value && value->is() == TYPE_ARRAY) {
 					return (Array *) value;
 				} else {
@@ -104,19 +94,72 @@ namespace JSON {
 
 			std::vector<Any *> array;
 
-			Any *& operator[](size_t i) noexcept {
+			template <typename T>
+			inline const T *get(size_t i) const noexcept {
+				if (i < this->array.size()) {
+					return T::is(this->array[i]);
+				} else {
+					return (T *) nullptr;
+				}
+			}
+
+			template <typename T>
+			size_t get(std::vector<const T *>& vector) const noexcept {
+				size_t items = 0;
+
+				const size_t size = this->array.size();
+				for (size_t i = 0; i < size; ++i) {
+					const T *value = T::is(this->array[i]);
+					if (value) {
+						vector.push_back(value);
+						++items;
+					}
+				}
+
+				return items;
+			}
+
+			template <typename T, typename U>
+			size_t get(std::vector<const T *>& vector) const noexcept {
+				size_t items = 0;
+
+				const size_t size = this->array.size();
+				for (size_t i = 0; i < size; ++i) {
+					const T *value = T::is(U::is(this->array[i]));
+					if (value) {
+						vector.push_back(value);
+						++items;
+					}
+				}
+
+				return items;
+			}
+
+			template <typename T, typename U, const T U:: *data>
+			size_t get(std::vector<const T *>& vector) const noexcept {
+				size_t items = 0;
+
+				const size_t size = this->array.size();
+				for (size_t i = 0; i < size; ++i) {
+					const U *value = U::is(this->array[i]);
+					if (value) {
+						vector.push_back(&(value->*data));
+						++items;
+					}
+				}
+
+				return items;
+			}
+
+			inline Any *& operator[](size_t i) noexcept {
 				return this->array[i];
 			}
 
-			const Any *const& operator[](size_t i) const noexcept {
+			inline const Any *const& operator[](size_t i) const noexcept {
 				return this->array[i];
 			}
 
-			void push(Any *const& value) {
-				this->array.push_back(value);
-			}
-
-			size_t size() const noexcept {
+			inline size_t size() const noexcept {
 				return this->array.size();
 			}
 
@@ -162,7 +205,7 @@ namespace JSON {
 				return TYPE_BOOLEAN;
 			}
 
-			static Boolean *is(const Any *const& value) {
+			static inline Boolean *is(const Any *const& value) {
 				if (value && value->is() == TYPE_BOOLEAN) {
 					return (Boolean *) value;
 				} else {
@@ -193,7 +236,7 @@ namespace JSON {
 				return TYPE_NULL;
 			}
 
-			static Null *is(const Any *const& value) {
+			static inline Null *is(const Any *const& value) {
 				if (value && value->is() == TYPE_NULL) {
 					return (Null *) value;
 				} else {
@@ -219,7 +262,7 @@ namespace JSON {
 				return TYPE_NUMBER;
 			}
 
-			static Number *is(const Any *const& value) {
+			static inline Number *is(const Any *const& value) {
 				if (value && value->is() == TYPE_NUMBER) {
 					return (Number *) value;
 				} else {
@@ -245,7 +288,7 @@ namespace JSON {
 				return TYPE_OBJECT;
 			}
 
-			static Object *is(const Any *const& value) {
+			static inline Object *is(const Any *const& value) {
 				if (value && value->is() == TYPE_OBJECT) {
 					return (Object *) value;
 				} else {
@@ -255,11 +298,21 @@ namespace JSON {
 
 			std::unordered_map<std::string, Any *> object;
 
-			Any *& operator[](const std::string& name) {
+			template <typename T>
+			inline const T *get(const std::string& name) const {
+				const auto& value = this->object.find(name);
+				if (value == object.end()) {
+					return (T *) nullptr;
+				} else {
+					return T::is(value->second);
+				}
+			}
+
+			inline Any *& operator[](const std::string& name) {
 				return this->object[name];
 			}
 
-			const Any *const& operator[](const std::string& name) const {
+			inline const Any *const& operator[](const std::string& name) const {
 				return this->object.at(name);
 			}
 
@@ -300,7 +353,7 @@ namespace JSON {
 				return TYPE_STRING;
 			}
 
-			static String *is(const Any *const& value) {
+			static inline String *is(const Any *const& value) {
 				if (value && value->is() == TYPE_STRING) {
 					return (String *) value;
 				} else {
@@ -327,6 +380,16 @@ namespace JSON {
 
 			virtual ~String() {}
 	};
+
+	static inline std::string stringify(const Any& value) {
+		std::ostringstream out;
+		value.stringify(out);
+		return out.str();
+	}
+
+	std::ostream& operator<<(std::ostream& out, const Any& value) {
+		return value.stringify(out);
+	}
 
 	static size_t parse(Any **value, const std::string& input, size_t index, size_t size);
 
