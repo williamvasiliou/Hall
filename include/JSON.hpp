@@ -300,12 +300,25 @@ namespace JSON {
 
 			template <typename T>
 			inline const T *get(const std::string& name) const {
-				const auto& value = this->object.find(name);
-				if (value == object.end()) {
-					return (T *) nullptr;
-				} else {
-					return T::is(value->second);
+				const auto& pair = this->object.find(name);
+				if (pair != object.end()) {
+					return T::is(pair->second);
 				}
+
+				return (T *) nullptr;
+			}
+
+			template <typename T, typename U, const T U:: *data>
+			inline const T *get(const std::string& name) const {
+				const auto& pair = this->object.find(name);
+				if (pair != object.end()) {
+					const U *value = U::is(pair->second);
+					if (value) {
+						return &(value->*data);
+					}
+				}
+
+				return (T *) nullptr;
 			}
 
 			inline Any *& operator[](const std::string& name) {
