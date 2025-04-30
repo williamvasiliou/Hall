@@ -301,7 +301,7 @@ namespace JSON {
 			template <typename T>
 			inline const T *get(const std::string& name) const {
 				const auto& pair = this->object.find(name);
-				if (pair != object.end()) {
+				if (pair != this->object.end()) {
 					return T::is(pair->second);
 				}
 
@@ -311,7 +311,7 @@ namespace JSON {
 			template <typename T, typename U, const T U:: *data>
 			inline const T *get(const std::string& name) const {
 				const auto& pair = this->object.find(name);
-				if (pair != object.end()) {
+				if (pair != this->object.end()) {
 					const U *value = U::is(pair->second);
 					if (value) {
 						return &(value->*data);
