@@ -44,6 +44,14 @@ namespace Trades {
 				return (Array *) nullptr;
 			}
 
+			static inline const Array *is(const T *item) {
+				std::vector<const T *> *vector = new std::vector<const T *>();
+				if (item) {
+					vector->push_back(item);
+				}
+				return new Array(vector);
+			}
+
 			const std::vector<const T *> *array;
 
 			inline const T *operator[](size_t i) const noexcept {
@@ -76,9 +84,13 @@ namespace Trades {
 			static const Item *is(const JSON::Object *object) {
 				if (object) {
 					const std::string *item = object->get<std::string, JSON::String, &JSON::String::string>("item");
-					const double *quantity = object->get<double, JSON::Number, &JSON::Number::number>("quantity");
-					if (item && quantity) {
-						return new Item(item, quantity);
+					if (item) {
+						const double *quantity = object->get<double, JSON::Number, &JSON::Number::number>("quantity");
+						if (quantity) {
+							return new Item(item, quantity);
+						}
+
+						return new Item(item, &Item::fallback);
 					}
 				}
 
@@ -91,52 +103,134 @@ namespace Trades {
 			~Item() {}
 
 		private:
+			static constexpr double fallback = 1.0;
+
 			explicit Item(const std::string *item, const double *quantity) :
 				item(item),
 				quantity(quantity)
 			{}
 	};
 
+	class Choice {
+		public:
+			static const Choice *is(const JSON::Object *object) {
+				const Item *item = Item::is(object);
+				if (item) {
+					const JSON::Array *array = object->get<JSON::Array>("choice");
+					if (array) {
+						delete item;
+					} else {
+						return new Choice(Array<Item>::is(item));
+					}
+				} else {
+					const Array<Item> *choice = Array<Item>::is(object, "choice");
+					if (choice) {
+						if (choice->size() > 0) {
+							return new Choice(choice);
+						}
+						delete choice;
+					}
+				}
+
+				return (Choice *) nullptr;
+			}
+
+			const Array<Item> *choice;
+
+			inline const Item *get(size_t i) const noexcept {
+				return (*this->choice)[i];
+			}
+
+			inline size_t size() const noexcept {
+				return this->choice->size();
+			}
+
+			~Choice() {
+				delete this->choice;
+			}
+
+		private:
+			explicit Choice(const Array<Item> *choice) :
+				choice(choice)
+			{}
+	};
+
 	class Trade {
 		public:
 			static const Trade *is(const JSON::Object *object) {
-				if (object) {
-					const Array<Item> *wants = Array<Item>::is(object, "wants");
-					const Array<Item> *gives = Array<Item>::is(object, "gives");
-					if (wants && gives) {
-						return new Trade(wants, gives);
-					} else {
-						if (wants) {
-							delete wants;
-						}
+				const Array<Choice> *wants = Array<Choice>::is(object, "wants");
+				const Array<Choice> *gives = Array<Choice>::is(object, "gives");
+				if (wants && gives && wants->size() > 0 && gives->size() > 0) {
+					return new Trade(wants, gives);
+				} else {
+					if (wants) {
+						delete wants;
+					}
 
-						if (gives) {
-							delete gives;
-						}
+					if (gives) {
+						delete gives;
 					}
 				}
 
 				return (Trade *) nullptr;
 			}
 
-			const Array<Item> *wants;
-			const Array<Item> *gives;
-
-			template <auto AbstractTrade:: *data, const Array<Item> *Trade:: *items>
-			inline void push(AbstractTrade& trade) const noexcept {
-				auto& out = trade.*data;
-
-				const Array<Item>& array = *(this->*items);
-				const size_t size = array.size();
-				for (size_t i = 0; i < size; ++i) {
-					const Item *item = array[i];
-					out[*item->item] += *item->quantity;
-				}
-			}
+			const Array<Choice> *wants;
+			const Array<Choice> *gives;
 
 			template <typename T>
 			inline size_t push(T& trades) const noexcept {
-				return trades.push(*this);
+				const size_t wants = this->wants->size();
+				const size_t gives = this->gives->size();
+				std::vector<size_t> index;
+				std::vector<size_t> size;
+				size_t items = 0;
+
+				const Array<Choice>& in = *this->wants;
+				for (size_t i = 0; i < wants; ++i) {
+					index.push_back(0);
+					size.push_back(in[i]->size());
+				}
+
+				const Array<Choice>& out = *this->gives;
+				for (size_t i = 0; i < gives; ++i) {
+					index.push_back(0);
+					size.push_back(out[i]->size());
+				}
+
+				while (index[0] < size[0]) {
+					AbstractTrade trade;
+
+					size_t i = 0;
+					for (size_t j = 0; j < wants; ++j) {
+						const Item *item = in[j]->get(index[i]);
+						trade.in[*item->item] += *item->quantity;
+						++i;
+					}
+
+					for (size_t j = 0; j < gives; ++j) {
+						const Item *item = out[j]->get(index[i]);
+						trade.out[*item->item] += *item->quantity;
+						++i;
+					}
+					--i;
+
+					++index[i];
+					while (i > 0) {
+						if (index[i] >= size[i]) {
+							index[i] = 0;
+							++index[i - 1];
+						} else {
+							break;
+						}
+
+						--i;
+					}
+
+					items += trades.push(trade);
+				}
+
+				return items;
 			}
 
 			~Trade() {
@@ -145,7 +239,7 @@ namespace Trades {
 			}
 
 		private:
-			explicit Trade(const Array<Item> *wants, const Array<Item> *gives) :
+			explicit Trade(const Array<Choice> *wants, const Array<Choice> *gives) :
 				wants(wants),
 				gives(gives)
 			{}
@@ -154,11 +248,12 @@ namespace Trades {
 	class Group {
 		public:
 			static Group *is(const JSON::Object *object) {
-				if (object) {
-					const Array<Trade> *trades = Array<Trade>::is(object, "trades");
-					if (trades) {
+				const Array<Trade> *trades = Array<Trade>::is(object, "trades");
+				if (trades) {
+					if (trades->size() > 0) {
 						return new Group(trades);
 					}
+					delete trades;
 				}
 
 				return (Group *) nullptr;
@@ -184,10 +279,16 @@ namespace Trades {
 	class Tier {
 		public:
 			static const Tier *is(const JSON::Object *object) {
-				if (object) {
-					const Array<Group> *groups = Array<Group>::is(object, "groups");
-					if (groups) {
+				const Array<Group> *groups = Array<Group>::is(object, "groups");
+				if (groups) {
+					if (groups->size() > 0) {
 						return new Tier(groups);
+					}
+					delete groups;
+				} else {
+					const Group *group = Group::is(object);
+					if (group) {
+						return new Tier(Array<Group>::is(group));
 					}
 				}
 
@@ -214,11 +315,12 @@ namespace Trades {
 	class Villager {
 		public:
 			static const Villager *is(const JSON::Object *object) {
-				if (object) {
-					const Array<Tier> *tiers = Array<Tier>::is(object, "tiers");
-					if (tiers) {
+				const Array<Tier> *tiers = Array<Tier>::is(object, "tiers");
+				if (tiers) {
+					if (tiers->size() > 0) {
 						return new Villager(tiers);
 					}
+					delete tiers;
 				}
 
 				return (Villager *) nullptr;
@@ -255,13 +357,6 @@ namespace Trades {
 				}
 
 				return 0;
-			}
-
-			inline size_t push(const Trade& trade) noexcept {
-				AbstractTrade items;
-				trade.push<&AbstractTrade::in, &Trade::wants>(items);
-				trade.push<&AbstractTrade::out, &Trade::gives>(items);
-				return this->push(items);
 			}
 
 			template <typename T, typename U, const Array<T> *U:: *data>
