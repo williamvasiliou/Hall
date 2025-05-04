@@ -7,6 +7,7 @@
 #include "JSON.hpp"
 #include <map>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -978,11 +979,378 @@ namespace Trades {
 				return items;
 			}
 
+			static const size_t MAX_LENGTH = 65536;
+			size_t file(const std::string& source) {
+				const size_t size = this->files.size();
+				this->files.push_back({
+					source,
+					std::vector<AbstractTrade>(),
+				});
+
+				size_t items = 0;
+				std::ifstream is(source, std::ifstream::binary);
+				if (is) {
+					is.seekg(0, is.end);
+					size_t length = is.tellg();
+					is.seekg(0, is.beg);
+
+					if (length <= MAX_LENGTH) {
+						char *buffer = new char[length];
+						is.read(buffer, length);
+						items = this->parse(this->files[size], std::string(buffer, length));
+						delete[] buffer;
+					}
+
+					is.close();
+				}
+
+				return items;
+			}
+
+			size_t update(const std::string& source) {
+				using std::filesystem::recursive_directory_iterator;
+				using std::filesystem::path;
+
+				size_t items = 0;
+				for (const auto& entry : recursive_directory_iterator(source)) {
+					if (entry.is_regular_file()) {
+						const path& file = entry.path();
+						if (file.has_extension() && file.extension() == ".json") {
+							items += this->file(file);
+						}
+					}
+				}
+
+				return items;
+			}
+
 			~Trades() {}
 
 		private:
+			size_t parse(File& file, const std::string& source) {
+				size_t items = 0;
+				this->trades = &file.trades;
+
+				const JSON::Any *value = JSON::parse(source);
+				if (value) {
+					const JSON::Object *object = JSON::Object::is(value);
+					if (object) {
+						const Brewing *brewing = Brewing::is(object);
+						const Crafting *crafting = Crafting::is(object);
+						const Furnace *furnace = Furnace::is(object);
+						const Smithing *smithing = Smithing::is(object);
+						const Villager *villager = Villager::is(object);
+
+						if (brewing) {
+							items = brewing->push(*this);
+							delete brewing;
+						}
+
+						if (crafting) {
+							if (!items) {
+								items = crafting->push(*this);
+							}
+							delete crafting;
+						}
+
+						if (furnace) {
+							if (!items) {
+								items = furnace->push(*this);
+							}
+							delete furnace;
+						}
+
+						if (smithing) {
+							if (!items) {
+								items = smithing->push(*this);
+							}
+							delete smithing;
+						}
+
+						if (villager) {
+							if (!items) {
+								items = villager->push(*this);
+							}
+							delete villager;
+						}
+					}
+
+					delete value;
+				}
+
+				return items;
+			}
+
 			std::vector<AbstractTrade> *trades;
 			std::vector<File> files;
+
+			friend class Commit;
+	};
+
+	typedef struct {
+		std::vector<size_t> index;
+		std::vector<size_t> next;
+		std::vector<size_t> item;
+		std::vector<double> quantity;
+	} Index;
+
+	class Commit {
+		public:
+			explicit Commit(const Trades& trades) {
+				for (const auto& file : trades.files) {
+					const std::string& name = file.name;
+					this->trades[name] = std::vector<AbstractTrade>();
+					for (const auto& trade : file.trades) {
+						AbstractTrade commit;
+
+						for (const auto& pair : trade.in) {
+							const std::string item = Commit::item(pair.first);
+							this->items.insert(item);
+							commit.in[item] += pair.second;
+						}
+
+						for (const auto& pair : trade.out) {
+							const std::string item = Commit::item(pair.first);
+							this->items.insert(item);
+							commit.out[item] += pair.second;
+						}
+
+						this->trades[name].push_back(commit);
+					}
+				}
+
+				std::map<std::string, size_t> index;
+				size_t i = 0;
+				for (const auto& item : this->items) {
+					index[item] = i;
+					++i;
+				}
+
+				this->size = 0;
+				i = 0;
+				for (const auto& pair : this->trades) {
+					this->size += pair.second.size();
+					for (const auto& trade : pair.second) {
+						if (i > 0) {
+							const size_t index = this->in.next[i - 1];
+							this->in.index.push_back(index);
+							this->in.next.push_back(index + trade.in.size());
+						} else {
+							this->in.index.push_back(0);
+							this->in.next.push_back(trade.in.size());
+						}
+
+						for (const auto& in : trade.in) {
+							const size_t first = index.at(in.first);
+							this->index[first].push_back(this->in.item.size());
+							this->in.item.push_back(first);
+							this->in.quantity.push_back(in.second);
+						}
+
+						if (i > 0) {
+							const size_t index = this->out.next[i - 1];
+							this->out.index.push_back(index);
+							this->out.next.push_back(index + trade.out.size());
+						} else {
+							this->out.index.push_back(0);
+							this->out.next.push_back(trade.out.size());
+						}
+
+						for (const auto& out : trade.out) {
+							this->out.item.push_back(index.at(out.first));
+							this->out.quantity.push_back(out.second);
+						}
+
+						++i;
+					}
+				}
+
+				const size_t size = this->items.size();
+				size_t next = 0;
+				for (i = 0; i < size; ++i) {
+					const auto& pair = this->index.find(i);
+					if (pair == this->index.end()) {
+						this->next.push_back(next);
+					} else {
+						const auto& trades = pair->second;
+						next += trades.size();
+						this->next.push_back(next);
+						for (const auto& trade : trades) {
+							this->trade.push_back(trade);
+						}
+					}
+				}
+			}
+
+			std::ostream& Items(std::ostream& out) const noexcept {
+				out << "#ifndef ITEMS_H" << std::endl;
+				out << "#define ITEMS_H" << std::endl;
+				out << std::endl;
+				out << "#include <cstdint>" << std::endl;
+				out << "#include <string>" << std::endl;
+				out << std::endl;
+				out << "namespace Items {" << std::endl;
+				out << "\tstatic inline const size_t size = " << this->items.size() << ";" << std::endl;
+				out << std::endl;
+				out << "\ttypedef struct {" << std::endl;
+				out << "\t\tconst std::string name;" << std::endl;
+				out << "\t\tconst double rate;" << std::endl;
+				out << "\t\tconst size_t index;" << std::endl;
+				out << "\t\tconst size_t next;" << std::endl;
+				out << "\t} Item;" << std::endl;
+				out << std::endl;
+				out << "\tstatic const Item item[size] = {" << std::endl;
+				size_t i = 0;
+				for (const auto& item : this->items) {
+					out << "\t\t{" << JSON::quote(item) << ", 0.0, ";
+					if (i > 0) {
+						out << this->next[i - 1] << ", " << this->next[i] << "}," << std::endl;
+					} else {
+						out << "0, " << this->next[i] << "}," << std::endl;
+					}
+					++i;
+				}
+				out << "\t};" << std::endl;
+				out << std::endl;
+				out << "\tnamespace minecraft {" << std::endl;
+				i = 0;
+				for (const auto& item : this->items) {
+					out << "\t\tstatic inline const size_t " << item.substr(10) << " = " << i << ";" << std::endl;
+					++i;
+				}
+				out << "\t} // namespace minecraft" << std::endl;
+				out << std::endl;
+				out << "\tstatic inline const size_t trades = " << this->trade.size() << ";" << std::endl;
+				out << "\tstatic const size_t trade[trades] = {" << std::endl;
+				this->insert(out, this->trade, "\t\t");
+				out << "\t};" << std::endl;
+				out << "} // namespace Items" << std::endl;
+				out << std::endl;
+				out << "#endif // ITEMS_H" << std::endl;
+				return out;
+			}
+
+			std::ostream& Trade(std::ostream& out) const noexcept {
+				out << "#ifndef TRADE_H" << std::endl;
+				out << "#define TRADE_H" << std::endl;
+				out << std::endl;
+				out << "#include \"Inventory.hpp\"" << std::endl;
+				out << std::endl;
+				out << "namespace Trade {" << std::endl;
+				out << "\tstatic inline const size_t trades = " << this->size << ";" << std::endl;
+				out << std::endl;
+				this->insert(out, "in", this->in) << std::endl;
+				this->insert(out, "out", this->out) << std::endl;
+				out << "\tstatic inline const double UNIT = 1e-6;" << std::endl;
+				out << "\tstatic void on(Inventory& inventory, const double *weight, size_t trade) {" << std::endl;
+				out << "\t\tsize_t index = Trade::in::index[trade];" << std::endl;
+				out << "\t\tsize_t next = Trade::in::next[trade];" << std::endl;
+				out << "\t\tdouble amount = (inventory.get(Trade::in::item[index]) * weight[index]) / Trade::in::quantity[index];" << std::endl;
+				out << "\t\twhile (++index < next) {" << std::endl;
+				out << "\t\t\tif (amount < Trade::UNIT) {" << std::endl;
+				out << "\t\t\t\treturn;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << "\t\t\tconst double value = (inventory.get(Trade::in::item[index]) * weight[index]) / Trade::in::quantity[index];" << std::endl;
+				out << "\t\t\tif (value < amount) {" << std::endl;
+				out << "\t\t\t\tamount = value;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\tif (amount >= Trade::UNIT) {" << std::endl;
+				out << "\t\t\tindex = Trade::in::index[trade];" << std::endl;
+				out << "\t\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\t\tinventory.remove(Trade::in::item[index], Trade::in::quantity[index] * amount);" << std::endl;
+				out << "\t\t\t\t++index;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\t\tindex = Trade::out::index[trade];" << std::endl;
+				out << "\t\t\tnext = Trade::out::next[trade];" << std::endl;
+				out << "\t\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\t\tinventory.add(Trade::out::item[index], Trade::out::quantity[index] * amount);" << std::endl;
+				out << "\t\t\t\t++index;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << "\t}" << std::endl;
+				out << "} // namespace Trade" << std::endl;
+				out << std::endl;
+				out << "#endif // TRADE_H" << std::endl;
+				return out;
+			}
+
+			static inline const std::string item(const std::string& first) noexcept {
+				std::string item = first;
+				if (first.find("minecraft:") != 0) {
+					item = "minecraft:" + first;
+				}
+
+				const size_t index = item.find(":", 10);
+				if (index == std::string::npos) {
+					return item;
+				} else {
+					return item.substr(0, index);
+				}
+			}
+
+			~Commit() {}
+
+		private:
+			std::set<std::string> items;
+			std::map<size_t, std::vector<size_t>> index;
+			std::vector<size_t> next;
+			std::vector<size_t> trade;
+			size_t size;
+			std::map<std::string, std::vector<AbstractTrade>> trades;
+			Index in;
+			Index out;
+
+			static inline const size_t LINE = 100;
+			template <typename T>
+			std::ostream& insert(std::ostream& out, const std::vector<T>& vector, const std::string& first) const noexcept {
+				std::ostringstream buffer;
+				bool rest = false;
+				for (const auto& item : vector) {
+					if (rest) {
+						buffer << ", ";
+					} else {
+						buffer << first;
+					}
+					buffer << item;
+					rest = true;
+
+					if (buffer.str().size() > Commit::LINE) {
+						out << buffer.str() << "," << std::endl;
+						buffer.str("");
+						rest = false;
+					}
+				}
+
+				if (rest) {
+					out << buffer.str() << "," << std::endl;
+				}
+				return out;
+			}
+
+			std::ostream& insert(std::ostream& out, const std::string& name, const Index& index) const noexcept {
+				out << "\tnamespace " << name << " {" << std::endl;
+				out << "\t\tstatic const size_t index[trades] = {" << std::endl;
+				this->insert(out, index.index, "\t\t\t");
+				out << "\t\t};" << std::endl;
+				out << std::endl;
+				out << "\t\tstatic const size_t next[trades] = {" << std::endl;
+				this->insert(out, index.next, "\t\t\t");
+				out << "\t\t};" << std::endl;
+				out << std::endl;
+				out << "\t\tstatic inline const size_t size = " << index.item.size() << ";" << std::endl;
+				out << "\t\tstatic const size_t item[size] = {" << std::endl;
+				this->insert(out, index.item, "\t\t\t");
+				out << "\t\t};" << std::endl;
+				out << std::endl;
+				out << "\t\tstatic const double quantity[size] = {" << std::endl;
+				this->insert(out, index.quantity, "\t\t\t");
+				out << "\t\t};" << std::endl;
+				out << "\t} // namespace " << name << std::endl;
+				return out;
+			}
 	};
 } // namespace Trades
 
