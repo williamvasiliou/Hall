@@ -1007,7 +1007,7 @@ namespace Trades {
 				return items;
 			}
 
-			size_t update(const std::string& source) {
+			size_t directory(const std::string& source) {
 				using std::filesystem::recursive_directory_iterator;
 				using std::filesystem::path;
 
@@ -1145,6 +1145,11 @@ namespace Trades {
 							this->index[first].push_back(this->in.item.size());
 							this->in.item.push_back(first);
 							this->in.quantity.push_back(in.second);
+
+							for (const auto& out : trade.out) {
+								this->predecessors[out.first].insert(in.first);
+								this->successors[in.first].insert(out.first);
+							}
 						}
 
 						if (i > 0) {
@@ -1202,7 +1207,7 @@ namespace Trades {
 				out << "\tstatic const Item item[size] = {" << std::endl;
 				size_t i = 0;
 				for (const auto& item : this->items) {
-					out << "\t\t{" << JSON::quote(item) << ", 0.0, ";
+					out << "\t\t{" << JSON::quote(item.substr(10)) << ", 0.0, ";
 					if (i > 0) {
 						out << this->next[i - 1] << ", " << this->next[i] << "}," << std::endl;
 					} else {
@@ -1302,6 +1307,8 @@ namespace Trades {
 			std::map<std::string, std::vector<AbstractTrade>> trades;
 			Index in;
 			Index out;
+			std::map<std::string, std::set<std::string>> predecessors;
+			std::map<std::string, std::set<std::string>> successors;
 
 			static inline const size_t LINE = 100;
 			template <typename T>
