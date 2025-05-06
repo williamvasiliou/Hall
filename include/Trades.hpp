@@ -1207,7 +1207,7 @@ namespace Trades {
 				out << "\tstatic const Item item[size] = {" << std::endl;
 				size_t i = 0;
 				for (const auto& item : this->items) {
-					out << "\t\t{" << JSON::quote(item.substr(10)) << ", 0.0, ";
+					out << "\t\t{" << JSON::quote(item.substr(Commit::SIZE)) << ", 0.0, ";
 					if (i > 0) {
 						out << this->next[i - 1] << ", " << this->next[i] << "}," << std::endl;
 					} else {
@@ -1220,7 +1220,7 @@ namespace Trades {
 				out << "\tnamespace minecraft {" << std::endl;
 				i = 0;
 				for (const auto& item : this->items) {
-					out << "\t\tstatic inline const size_t " << item.substr(10) << " = " << i << ";" << std::endl;
+					out << "\t\tstatic inline const size_t " << item.substr(Commit::SIZE) << " = " << i << ";" << std::endl;
 					++i;
 				}
 				out << "\t} // namespace minecraft" << std::endl;
@@ -1276,19 +1276,83 @@ namespace Trades {
 				out << "\t\t\t}" << std::endl;
 				out << "\t\t}" << std::endl;
 				out << "\t}" << std::endl;
+				out << std::endl;
+				out << "\tstatic std::ostream& print(std::ostream& out, size_t trade) {" << std::endl;
+				out << "\t\tout << \"{\" << std::endl;" << std::endl;
+				out << "\t\tout << \"\\t\\\"in\\\": {\" << std::endl;" << std::endl;
+				out << std::endl;
+				out << "\t\tsize_t index = Trade::in::index[trade];" << std::endl;
+				out << "\t\tsize_t next = Trade::in::next[trade];" << std::endl;
+				out << "\t\tbool rest = false;" << std::endl;
+				out << "\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\tif (rest) {" << std::endl;
+				out << "\t\t\t\tout << \",\" << std::endl;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\t\tout << \"\\t\\t\\\"\" << Items::item[Trade::in::item[index]].name << \"\\\": \" << Trade::in::quantity[index];" << std::endl;
+				out << "\t\t\trest = true;" << std::endl;
+				out << "\t\t\t++index;" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\tout << std::endl << \"\\t},\" << std::endl;" << std::endl;
+				out << "\t\tout << \"\\t\\\"out\\\": {\" << std::endl;" << std::endl;
+				out << std::endl;
+				out << "\t\tindex = Trade::out::index[trade];" << std::endl;
+				out << "\t\tnext = Trade::out::next[trade];" << std::endl;
+				out << "\t\trest = false;" << std::endl;
+				out << "\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\tif (rest) {" << std::endl;
+				out << "\t\t\t\tout << \",\" << std::endl;" << std::endl;
+				out << "\t\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\t\tout << \"\\t\\t\\\"\" << Items::item[Trade::out::item[index]].name << \"\\\": \" << Trade::out::quantity[index];" << std::endl;
+				out << "\t\t\trest = true;" << std::endl;
+				out << "\t\t\t++index;" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << std::endl;
+				out << "\t\tout << std::endl << \"\\t}\" << std::endl;" << std::endl;
+				out << "\t\tout << \"}\" << std::endl;" << std::endl;
+				out << "\t\treturn out;" << std::endl;
+				out << "\t}" << std::endl;
 				out << "} // namespace Trade" << std::endl;
 				out << std::endl;
 				out << "#endif // TRADE_H" << std::endl;
 				return out;
 			}
 
-			static inline const std::string item(const std::string& first) noexcept {
-				std::string item = first;
-				if (first.find("minecraft:") != 0) {
-					item = "minecraft:" + first;
+			std::ostream& Document(std::ostream& out) const noexcept {
+				out << "# Items" << std::endl;
+				for (const auto& item : this->items) {
+					out << std::endl;
+					out << "## " << Commit::head(item.substr(Commit::SIZE)) << std::endl;
+					this->insert(out, this->predecessors, item, "### ", "predecessor");
+					this->insert(out, this->successors, item, "### ", "successor");
+				}
+				return out;
+			}
+
+			static inline const std::string head(const std::string& first) noexcept {
+				std::string item;
+
+				for (const char c : first) {
+					if (c == '_') {
+						item += '\\';
+					}
+					item += c;
 				}
 
-				const size_t index = item.find(":", 10);
+				return item;
+			}
+
+			static inline const std::string SUBSTR{"minecraft:"};
+			static inline const size_t SIZE = SUBSTR.size();
+			static inline const std::string item(const std::string& first) noexcept {
+				std::string item = first;
+				if (first.find(Commit::SUBSTR) != 0) {
+					item = Commit::SUBSTR + first;
+				}
+
+				const size_t index = item.find(":", Commit::SIZE);
 				if (index == std::string::npos) {
 					return item;
 				} else {
@@ -1310,14 +1374,45 @@ namespace Trades {
 			std::map<std::string, std::set<std::string>> predecessors;
 			std::map<std::string, std::set<std::string>> successors;
 
+			inline std::ostream& insert(std::ostream& out, const std::map<std::string, std::set<std::string>>& map, const std::string& item, const std::string& first, const std::string& second) const noexcept {
+				const auto& pair = map.find(item);
+
+				if (pair == map.end()) {
+					out << std::endl;
+					out << first << "0 " << second << "s" << std::endl;
+				} else {
+					const auto& items = pair->second;
+					const size_t size = items.size();
+
+					out << std::endl;
+					if (size == 1) {
+						out << first << "1 " << second << std::endl;
+					} else {
+						out << first << size << " " << second << "s" << std::endl;
+					}
+
+					out << std::endl;
+					for (const auto& item : items) {
+						out << "- " << Commit::head(item.substr(Commit::SIZE)) << std::endl;
+					}
+				}
+
+				return out;
+			}
+
 			static inline const size_t LINE = 100;
 			template <typename T>
 			std::ostream& insert(std::ostream& out, const std::vector<T>& vector, const std::string& first) const noexcept {
+				std::vector<std::string> items;
+				std::vector<size_t> index;
+				size_t i = 0;
+
 				std::ostringstream buffer;
 				bool rest = false;
 				for (const auto& item : vector) {
 					if (rest) {
 						buffer << ", ";
+						++i;
 					} else {
 						buffer << first;
 					}
@@ -1325,19 +1420,66 @@ namespace Trades {
 					rest = true;
 
 					if (buffer.str().size() > Commit::LINE) {
-						out << buffer.str() << "," << std::endl;
+						items.push_back(buffer.str() + ",");
+						index.push_back(i);
+						i = 0;
 						buffer.str("");
 						rest = false;
 					}
 				}
 
 				if (rest) {
-					out << buffer.str() << "," << std::endl;
+					items.push_back(buffer.str() + ",");
+					index.push_back(i);
+				}
+
+				size_t size = items.size();
+				if (size > 0) {
+					size_t max = items[0].size();
+
+					for (i = 1; i < size; ++i) {
+						const size_t value = items[i].size();
+						if (value > max) {
+							max = value;
+						}
+					}
+
+					--size;
+					for (i = 0; i < size; ++i) {
+						const size_t value = max - items[i].size();
+						const size_t j = value / index[i];
+						const size_t k = value % index[i];
+						size_t l = 0;
+
+						buffer.str("");
+						for (const char c : items[i]) {
+							if (c == ' ') {
+								l += k;
+								if (l >= index[i]) {
+									l -= index[i];
+									for (size_t m = 0; m <= j; ++m) {
+										buffer << ' ';
+									}
+								} else {
+									for (size_t m = 0; m < j; ++m) {
+										buffer << ' ';
+									}
+								}
+							}
+
+							buffer << c;
+						}
+						items[i] = buffer.str();
+					}
+				}
+
+				for (const auto& item : items) {
+					out << item << std::endl;
 				}
 				return out;
 			}
 
-			std::ostream& insert(std::ostream& out, const std::string& name, const Index& index) const noexcept {
+			inline std::ostream& insert(std::ostream& out, const std::string& name, const Index& index) const noexcept {
 				out << "\tnamespace " << name << " {" << std::endl;
 				out << "\t\tstatic const size_t index[trades] = {" << std::endl;
 				this->insert(out, index.index, "\t\t\t");
