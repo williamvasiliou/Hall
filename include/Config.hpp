@@ -6,6 +6,7 @@
 #include "JSON.hpp"
 #include <string>
 #include <vector>
+#include "Weights.hpp"
 
 namespace Config {
 	class Weights {
@@ -20,6 +21,12 @@ namespace Config {
 				}
 
 				return (Weights *) nullptr;
+			}
+
+			static inline const Weights *fill() {
+				double *weights = new double[Items::trades];
+				::Weights::fill(weights);
+				return new Weights(weights);
 			}
 
 			const double *weights;
@@ -75,11 +82,10 @@ namespace Config {
 
 	class Population {
 		public:
-			static const Population *is(const JSON::Array *array) {
+			static const Population *is(size_t size, const JSON::Array *array) {
 				if (array) {
-					const size_t size = array->size();
 					std::vector<const Weights *> *vector = new std::vector<const Weights *>();
-					if (array->get<Weights, JSON::Array>(*vector) == size) {
+					if (Population::get(array->array, *vector, size)) {
 						return new Population(vector);
 					}
 
@@ -92,13 +98,26 @@ namespace Config {
 				return (Population *) nullptr;
 			}
 
+			static const Population *fill() {
+				std::vector<const Weights *> *vector = new std::vector<const Weights *>();
+
+				size_t items = 0;
+				while (items < Population::SIZE) {
+					vector->push_back(Weights::fill());
+					++items;
+				}
+
+				return new Population(vector);
+			}
+
+			static inline const size_t SIZE = 100;
 			const std::vector<const Weights *> *population;
 
 			inline size_t size() const noexcept {
 				return this->population->size();
 			}
 
-			double *weights() const noexcept {
+			::Weights *weights() const noexcept {
 				const auto& population = *this->population;
 				const size_t size = population.size();
 
@@ -113,10 +132,10 @@ namespace Config {
 						}
 					}
 
-					return weights;
+					return new ::Weights(size, weights);
 				}
 
-				return (double *) nullptr;
+				return (::Weights *) nullptr;
 			}
 
 			~Population() {
@@ -130,50 +149,98 @@ namespace Config {
 			explicit Population(const std::vector<const Weights *> *population) :
 				population(population)
 			{}
-	};
 
-	class Config {
-		public:
-			static const Config *is(const JSON::Object *object) {
-				if (object) {
-					const Population *population = Population::is(object->get<JSON::Array>("population"));
-					if (population) {
-						return new Config(population);
+			static inline bool get(const std::vector<JSON::Any *>& array, std::vector<const Weights *>& weights, size_t size) noexcept {
+				size_t items = 0;
+
+				for (const auto& item : array) {
+					if (items < size) {
+						const Weights *value = Weights::is(JSON::Array::is(item));
+						if (value) {
+							weights.push_back(value);
+							++items;
+						}
+					} else {
+						break;
 					}
 				}
 
-				return (Config *) nullptr;
-			}
-
-			const Population *population;
-
-			~Config() {
-				delete this->population;
-			}
-
-		private:
-			explicit Config(const Population *population) :
-				population(population)
-			{}
-
-			static inline const Config *parse(const std::string& source) {
-				const Config *config = (Config *) nullptr;
-
-				JSON::Any *value = JSON::parse(source);
-				if (value) {
-					config = Config::is(JSON::Object::is(value));
-					delete value;
+				while (items < size) {
+					weights.push_back(Weights::fill());
+					++items;
 				}
 
-				return config;
+				return true;
 			}
-
-			friend const Config *file(const std::string& source);
 	};
 
+	static inline size_t number(const double *number, size_t size) {
+		if (number) {
+			const double value = *number;
+
+			if (value < 0.0) {
+				return size;
+			} else {
+				return (size_t) value;
+			}
+		}
+
+		return size;
+	}
+
+	static inline bool parse(Inventory **inventory, ::Weights **weights, const std::string& source) {
+		bool config = false;
+
+		if (inventory && weights) {
+			JSON::Any *value = JSON::parse(source);
+			if (value) {
+				const JSON::Object *object = JSON::Object::is(value);
+				if (object) {
+					if (*inventory) {
+						delete *inventory;
+					}
+
+					const JSON::Object *items = object->get<JSON::Object>("items");
+					double *quantity = new double[Items::size] {};
+					if (items) {
+						for (size_t i = 0; i < Items::size; ++i) {
+							const std::string& name = Items::item[i].name;
+							const JSON::Number *value = items->get<JSON::Number>(name);
+							if (value) {
+								quantity[i] = value->number;
+							}
+						}
+					}
+					*inventory = Inventory::is(quantity);
+
+					if (*weights) {
+						delete *weights;
+					}
+
+					const Population *population = Population::is(number(object->get<double, JSON::Number, &JSON::Number::number>("population"), Population::SIZE), object->get<JSON::Array>("weights"));
+					if (population) {
+						*weights = population->weights();
+
+						delete population;
+					} else {
+						const Population *population = Population::fill();
+						*weights = population->weights();
+						delete population;
+					}
+
+					config = true;
+				}
+
+				delete value;
+			}
+		}
+
+		return config;
+	}
+
 	static inline const size_t MAX_LENGTH = 65536;
-	const Config *file(const std::string& source) {
-		const Config *config = (Config *) nullptr;
+	static bool file(Inventory **inventory, ::Weights **weights, const std::string& source) {
+		bool config = false;
 
 		std::ifstream is(source, std::ifstream::binary);
 		if (is) {
@@ -184,7 +251,7 @@ namespace Config {
 			if (length <= MAX_LENGTH) {
 				char *buffer = new char[length];
 				is.read(buffer, length);
-				config = Config::parse(std::string(buffer, length));
+				config = parse(inventory, weights, std::string(buffer, length));
 				delete[] buffer;
 			}
 

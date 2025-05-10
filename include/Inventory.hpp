@@ -3,11 +3,10 @@
 
 #include <iostream>
 #include "Items.hpp"
-using Items::size;
 
 class Inventory {
 	public:
-		Inventory();
+		static Inventory *is(const double *items);
 
 		double get(size_t i) const;
 		void set(size_t i, double amount);
@@ -18,13 +17,18 @@ class Inventory {
 		void commit();
 		void restore();
 
+		double operator[](size_t i) const noexcept;
 		friend std::ostream& operator<<(std::ostream& out, const Inventory& inventory);
 
 		~Inventory();
 
 	private:
-		double in[size];
-		double out[size];
+		explicit Inventory(const double *items);
+
+		const double *items;
+
+		double in[Items::size];
+		double out[Items::size];
 };
 
 #endif // INVENTORY_H
