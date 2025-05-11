@@ -656,7 +656,7 @@ namespace Trades {
 					}
 				}
 
-				result->push(trade);
+				this->result->push(trade);
 				return trades.push(trade);
 			}
 
@@ -703,7 +703,7 @@ namespace Trades {
 					trade.in[*item->item] += *item->quantity;
 				}
 
-				result->push(trade);
+				this->result->push(trade);
 				return trades.push(trade);
 			}
 
@@ -991,10 +991,10 @@ namespace Trades {
 				std::ifstream is(source, std::ifstream::binary);
 				if (is) {
 					is.seekg(0, is.end);
-					size_t length = is.tellg();
+					const size_t length = is.tellg();
 					is.seekg(0, is.beg);
 
-					if (length <= MAX_LENGTH) {
+					if (length <= Trades::MAX_LENGTH) {
 						char *buffer = new char[length];
 						is.read(buffer, length);
 						items = this->parse(this->files[size], std::string(buffer, length));
@@ -1247,15 +1247,15 @@ namespace Trades {
 				this->insert(out, "in", this->in) << std::endl;
 				this->insert(out, "out", this->out) << std::endl;
 				out << "\tstatic inline const double UNIT = 1e-6;" << std::endl;
-				out << "\tstatic void on(Inventory& inventory, const double *weight, size_t trade) {" << std::endl;
+				out << "\tstatic inline void on(Inventory& inventory, const double *weight, size_t trade) noexcept {" << std::endl;
 				out << "\t\tsize_t index = Trade::in::index[trade];" << std::endl;
 				out << "\t\tsize_t next = Trade::in::next[trade];" << std::endl;
-				out << "\t\tdouble amount = (inventory.get(Trade::in::item[index]) * weight[index]) / Trade::in::quantity[index];" << std::endl;
+				out << "\t\tdouble amount = (inventory[Trade::in::item[index]] * weight[index]) / Trade::in::quantity[index];" << std::endl;
 				out << "\t\twhile (++index < next) {" << std::endl;
 				out << "\t\t\tif (amount < Trade::UNIT) {" << std::endl;
 				out << "\t\t\t\treturn;" << std::endl;
 				out << "\t\t\t}" << std::endl;
-				out << "\t\t\tconst double value = (inventory.get(Trade::in::item[index]) * weight[index]) / Trade::in::quantity[index];" << std::endl;
+				out << "\t\t\tconst double value = (inventory[Trade::in::item[index]] * weight[index]) / Trade::in::quantity[index];" << std::endl;
 				out << "\t\t\tif (value < amount) {" << std::endl;
 				out << "\t\t\t\tamount = value;" << std::endl;
 				out << "\t\t\t}" << std::endl;
@@ -1263,21 +1263,27 @@ namespace Trades {
 				out << std::endl;
 				out << "\t\tif (amount >= Trade::UNIT) {" << std::endl;
 				out << "\t\t\tindex = Trade::in::index[trade];" << std::endl;
-				out << "\t\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\tinventory.remove(Trade::in::item[index], Trade::in::quantity[index] * amount);" << std::endl;
+				out << "\t\t\twhile (++index < next) {" << std::endl;
 				out << "\t\t\t\tinventory.remove(Trade::in::item[index], Trade::in::quantity[index] * amount);" << std::endl;
-				out << "\t\t\t\t++index;" << std::endl;
 				out << "\t\t\t}" << std::endl;
 				out << std::endl;
 				out << "\t\t\tindex = Trade::out::index[trade];" << std::endl;
 				out << "\t\t\tnext = Trade::out::next[trade];" << std::endl;
-				out << "\t\t\twhile (index < next) {" << std::endl;
+				out << "\t\t\tinventory.add(Trade::out::item[index], Trade::out::quantity[index] * amount);" << std::endl;
+				out << "\t\t\twhile (++index < next) {" << std::endl;
 				out << "\t\t\t\tinventory.add(Trade::out::item[index], Trade::out::quantity[index] * amount);" << std::endl;
-				out << "\t\t\t\t++index;" << std::endl;
 				out << "\t\t\t}" << std::endl;
 				out << "\t\t}" << std::endl;
 				out << "\t}" << std::endl;
 				out << std::endl;
-				out << "\tstatic std::ostream& print(std::ostream& out, size_t trade) {" << std::endl;
+				out << "\tstatic void on(Inventory& inventory, const double *weight) noexcept {" << std::endl;
+				out << "\t\tfor (size_t i = 0; i < trades; ++i) {" << std::endl;
+				out << "\t\t\ton(inventory, weight, i);" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << "\t}" << std::endl;
+				out << std::endl;
+				out << "\tstatic inline std::ostream& print(std::ostream& out, size_t trade) noexcept {" << std::endl;
 				out << "\t\tout << \"{\" << std::endl;" << std::endl;
 				out << std::endl;
 				out << "\t\tout << \"\\t\\\"in\\\": {\" << std::endl;" << std::endl;
@@ -1299,6 +1305,14 @@ namespace Trades {
 				out << "\t\tout << std::endl << \"\\t}\" << std::endl;" << std::endl;
 				out << std::endl;
 				out << "\t\tout << \"}\" << std::endl;" << std::endl;
+				out << "\t\treturn out;" << std::endl;
+				out << "\t}" << std::endl;
+				out << std::endl;
+				out << "\tstatic std::ostream& print(std::ostream& out) noexcept {" << std::endl;
+				out << "\t\tfor (size_t i = 0; i < trades; ++i) {" << std::endl;
+				out << "\t\t\tprint(out, i);" << std::endl;
+				out << "\t\t}" << std::endl;
+				out << std::endl;
 				out << "\t\treturn out;" << std::endl;
 				out << "\t}" << std::endl;
 				out << "} // namespace Trade" << std::endl;

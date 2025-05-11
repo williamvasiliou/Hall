@@ -31,6 +31,32 @@ void Weights::fill(double *weights) noexcept {
 	}
 }
 
+std::ostream& operator<<(std::ostream& out, const Weights& weights) {
+	out << "\t\"population\": " << weights.population << "," << std::endl;
+	out << "\t\"weights\": [" << std::endl;
+
+	size_t i = 0;
+	for (size_t j = 0; j < weights.population; ++j) {
+		if (j > 0) {
+			out << "," << std::endl;
+		}
+
+		out << "\t\t[";
+		for (size_t k = 0; k < Items::trades; ++k) {
+			if (k > 0) {
+				out << ", ";
+			}
+
+			out << weights.weight[i];
+			++i;
+		}
+		out << "]";
+	}
+
+	out << std::endl << "\t]";
+	return out;
+}
+
 Weights::~Weights() {
 	delete[] this->weight;
 }

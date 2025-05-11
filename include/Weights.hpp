@@ -1,6 +1,7 @@
 #ifndef WEIGHTS_H
 #define WEIGHTS_H
 
+#include <iostream>
 #include "Items.hpp"
 #include <random>
 
@@ -19,8 +20,18 @@ class Weights {
 
 		double *weight;
 
+		inline const double *first(size_t i) const noexcept {
+			return this->weight + i * Items::trades;
+		}
+
+		inline const double *second(size_t i) const noexcept {
+			return this->first(this->population + i);
+		}
+
 		static inline constexpr double UNIT = 1e-6;
 		static void fill(double *weight) noexcept;
+
+		friend std::ostream& operator<<(std::ostream& out, const Weights& weights);
 
 		~Weights();
 

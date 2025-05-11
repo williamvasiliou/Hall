@@ -1,15 +1,23 @@
 #include "Inventory.hpp"
 
-Inventory *Inventory::is(const double *items) {
+Inventory *Inventory::is(double *items, double *rate) {
 	if (!items) {
 		items = new double[Items::size] {};
 	}
 
-	return new Inventory(items);
+	if (!rate) {
+		rate = new double[Items::size] {};
+		for (size_t i = 0; i < Items::size; ++i) {
+			rate[i] = Items::item[i].rate;
+		}
+	}
+
+	return new Inventory(items, rate);
 }
 
-Inventory::Inventory(const double *items) :
+Inventory::Inventory(const double *items, const double *rate) :
 	items(items),
+	rate(rate),
 	in{},
 	out{}
 {
@@ -37,7 +45,7 @@ void Inventory::remove(size_t i, double amount) {
 
 void Inventory::commit() {
 	for (size_t i = 0; i < Items::size; ++i) {
-		this->out[i] += Items::item[i].rate;
+		this->out[i] += this->rate[i];
 		this->in[i] = this->out[i];
 	}
 }
@@ -54,29 +62,45 @@ double Inventory::operator[](size_t i) const noexcept {
 }
 
 std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
-	out << "Inventory:" << std::endl;
-
+	out << "\t\"items\": {" << std::endl;
+	bool rest = false;
 	for (size_t i = 0; i < Items::size; ++i) {
-		const Items::Item item = Items::item[i];
-		const double inventoryIn = inventory.in[i];
-		const double inventoryOut = inventory.out[i];
+		const double quantity = inventory.in[i];
+		if (quantity > 0.0) {
+			if (rest) {
+				std::cout << "," << std::endl;
+			}
 
-		out << "\t" << item.name << ": " << inventoryIn;
-
-		if (inventoryIn != inventoryOut) {
-			out << " to " << inventoryOut;
-		}
-
-		if (item.rate > 0.0) {
-			out << " (" << item.rate << "/T)" << std::endl;
-		} else {
-			out << std::endl;
+			std::cout << "\t\t\"" << Items::item[i].name << "\": " << quantity;
+			rest = true;
 		}
 	}
+	if (rest) {
+		out << std::endl;
+	}
+	out << "\t}," << std::endl;
 
+	out << "\t\"rate\": {" << std::endl;
+	rest = false;
+	for (size_t i = 0; i < Items::size; ++i) {
+		const double rate = inventory.rate[i];
+		if (rate > 0.0) {
+			if (rest) {
+				std::cout << "," << std::endl;
+			}
+
+			std::cout << "\t\t\"" << Items::item[i].name << "\": " << rate;
+			rest = true;
+		}
+	}
+	if (rest) {
+		out << std::endl;
+	}
+	out << "\t}";
 	return out;
 }
 
 Inventory::~Inventory() {
 	delete[] this->items;
+	delete[] this->rate;
 }

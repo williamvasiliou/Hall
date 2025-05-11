@@ -10221,24 +10221,27 @@
 
 ### 1 successor
 
-- trim\_templates
-
-## trim\_templates
-
-### 2 predecessors
-
-- trim\_materials
 - trimmable\_armors
 
-### 0 successors
-
-## trimmable\_armors
+## trim\_templates
 
 ### 0 predecessors
 
 ### 1 successor
 
+- trimmable\_armors
+
+## trimmable\_armors
+
+### 3 predecessors
+
+- trim\_materials
 - trim\_templates
+- trimmable\_armors
+
+### 1 successor
+
+- trimmable\_armors
 
 ## tripwire\_hook
 
@@ -11552,4 +11555,3 @@
 
 - banner
 - yellow\_carpet
-

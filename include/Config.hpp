@@ -4,6 +4,7 @@
 #include <fstream>
 #include "Inventory.hpp"
 #include "JSON.hpp"
+#include "Parameters.hpp"
 #include <string>
 #include <vector>
 #include "Weights.hpp"
@@ -83,9 +84,9 @@ namespace Config {
 	class Population {
 		public:
 			static const Population *is(size_t size, const JSON::Array *array) {
-				if (array) {
+				if (size > 0) {
 					std::vector<const Weights *> *vector = new std::vector<const Weights *>();
-					if (Population::get(array->array, *vector, size)) {
+					if (Population::get(array, *vector, size)) {
 						return new Population(vector);
 					}
 
@@ -172,6 +173,20 @@ namespace Config {
 
 				return true;
 			}
+
+			static inline bool get(const JSON::Array *array, std::vector<const Weights *>& weights, size_t size) noexcept {
+				if (array) {
+					return Population::get(array->array, weights, size);
+				} else {
+					size_t items = 0;
+					while (items < size) {
+						weights.push_back(Weights::fill());
+						++items;
+					}
+
+					return true;
+				}
+			}
 	};
 
 	static inline size_t number(const double *number, size_t size) {
@@ -188,10 +203,18 @@ namespace Config {
 		return size;
 	}
 
-	static inline bool parse(Inventory **inventory, ::Weights **weights, const std::string& source) {
+	static inline double number(const double *number, double size) {
+		if (number) {
+			return *number;
+		}
+
+		return size;
+	}
+
+	static inline bool parse(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source) {
 		bool config = false;
 
-		if (inventory && weights) {
+		if (inventory && parameters && weights) {
 			JSON::Any *value = JSON::parse(source);
 			if (value) {
 				const JSON::Object *object = JSON::Object::is(value);
@@ -206,12 +229,35 @@ namespace Config {
 						for (size_t i = 0; i < Items::size; ++i) {
 							const std::string& name = Items::item[i].name;
 							const JSON::Number *value = items->get<JSON::Number>(name);
-							if (value) {
+							if (value && value->number > 0.0) {
 								quantity[i] = value->number;
 							}
 						}
 					}
-					*inventory = Inventory::is(quantity);
+
+					const JSON::Object *rate = object->get<JSON::Object>("rate");
+					double *rates = new double[Items::size] {};
+					if (rate) {
+						for (size_t i = 0; i < Items::size; ++i) {
+							const std::string& name = Items::item[i].name;
+							const JSON::Number *value = rate->get<JSON::Number>(name);
+							if (value && value->number > 0.0) {
+								rates[i] = value->number;
+							} else {
+								rates[i] = Items::item[i].rate;
+							}
+						}
+					} else {
+						for (size_t i = 0; i < Items::size; ++i) {
+							rates[i] = Items::item[i].rate;
+						}
+					}
+					*inventory = Inventory::is(quantity, rates);
+
+					if (*parameters) {
+						delete *parameters;
+					}
+					*parameters = Parameters::is(number(object->get<double, JSON::Number, &JSON::Number::number>("bottom"), Parameters::BOTTOM), number(object->get<double, JSON::Number, &JSON::Number::number>("mutate"), Parameters::MUTATE), number(object->get<double, JSON::Number, &JSON::Number::number>("top"), Parameters::TOP), number(object->get<double, JSON::Number, &JSON::Number::number>("trade"), Parameters::TRADE), number(object->get<double, JSON::Number, &JSON::Number::number>("train"), Parameters::TRAIN));
 
 					if (*weights) {
 						delete *weights;
@@ -233,13 +279,34 @@ namespace Config {
 
 				delete value;
 			}
+
+			if (!config) {
+				if (*inventory) {
+					delete *inventory;
+				}
+				*inventory = Inventory::is((double *) nullptr, (double *) nullptr);
+
+				if (*parameters) {
+					delete *parameters;
+				}
+				*parameters = Parameters::is(Parameters::BOTTOM, Parameters::MUTATE, Parameters::TOP, Parameters::TRADE, Parameters::TRAIN);
+
+				if (*weights) {
+					delete *weights;
+				}
+				const Population *population = Population::fill();
+				*weights = population->weights();
+				delete population;
+
+				config = true;
+			}
 		}
 
 		return config;
 	}
 
 	static inline const size_t MAX_LENGTH = 65536;
-	static bool file(Inventory **inventory, ::Weights **weights, const std::string& source) {
+	static bool file(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source) {
 		bool config = false;
 
 		std::ifstream is(source, std::ifstream::binary);
@@ -251,7 +318,7 @@ namespace Config {
 			if (length <= MAX_LENGTH) {
 				char *buffer = new char[length];
 				is.read(buffer, length);
-				config = parse(inventory, weights, std::string(buffer, length));
+				config = parse(inventory, parameters, weights, std::string(buffer, length));
 				delete[] buffer;
 			}
 
@@ -259,6 +326,16 @@ namespace Config {
 		}
 
 		return config;
+	}
+
+	static inline std::ostream& print(std::ostream& out, const Inventory& inventory, const Parameters& parameters, const ::Weights& weights) noexcept {
+		out << "{" << std::endl;
+		out << inventory << "," << std::endl;
+		out << parameters << "," << std::endl;
+		out << weights << std::endl;
+		out << "}" << std::endl;
+
+		return out;
 	}
 } // namespace Config
 
