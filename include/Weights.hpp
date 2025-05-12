@@ -19,6 +19,15 @@ class Weights {
 		const size_t weights;
 
 		double *weight;
+		double *fitness;
+
+		inline const double *first() const noexcept {
+			return this->weight;
+		}
+
+		inline const double *second() const noexcept {
+			return this->weight + this->population * Items::trades;
+		}
 
 		inline const double *first(size_t i) const noexcept {
 			return this->weight + i * Items::trades;
@@ -28,8 +37,18 @@ class Weights {
 			return this->first(this->population + i);
 		}
 
+		inline double *first(size_t i) noexcept {
+			return this->weight + i * Items::trades;
+		}
+
+		inline double *second(size_t i) noexcept {
+			return this->first(this->population + i);
+		}
+
 		static inline constexpr double UNIT = 1e-6;
-		static void fill(double *weight) noexcept;
+		void fill() noexcept;
+		static void fill(double *weights) noexcept;
+		void fill(double *child, const double *weights) noexcept;
 
 		friend std::ostream& operator<<(std::ostream& out, const Weights& weights);
 

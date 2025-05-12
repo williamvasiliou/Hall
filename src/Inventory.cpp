@@ -57,10 +57,6 @@ void Inventory::restore() {
 	}
 }
 
-double Inventory::operator[](size_t i) const noexcept {
-	return this->in[i];
-}
-
 std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
 	out << "\t\"items\": {" << std::endl;
 	bool rest = false;

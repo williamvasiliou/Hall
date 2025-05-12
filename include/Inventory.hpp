@@ -17,7 +17,13 @@ class Inventory {
 		void commit();
 		void restore();
 
-		double operator[](size_t i) const noexcept;
+		inline double fitness() const noexcept {
+			return this->in[Items::minecraft::emerald];
+		}
+
+		inline double operator[](size_t i) const noexcept {
+			return this->in[i];
+		}
 		friend std::ostream& operator<<(std::ostream& out, const Inventory& inventory);
 
 		~Inventory();
