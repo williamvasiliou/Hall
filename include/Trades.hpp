@@ -22,6 +22,18 @@ namespace Trades {
 		std::vector<AbstractTrade> trades;
 	} File;
 
+	class Error {
+		private:
+			explicit Error() {}
+
+			static bool verbose;
+
+			~Error() {}
+
+			friend class Trades;
+	};
+	bool Error::verbose = false;
+
 	template <typename T>
 	class Array {
 		public:
@@ -952,10 +964,12 @@ namespace Trades {
 
 	class Trades {
 		public:
-			explicit Trades() :
+			explicit Trades(bool verbose) :
 				trades((std::vector<AbstractTrade> *) nullptr),
 				files()
-			{}
+			{
+				Error::verbose = verbose;
+			}
 
 			inline size_t push(const AbstractTrade& trade) noexcept {
 				if (this->trades && trade.in.size() > 0 && trade.out.size() > 0) {
@@ -999,11 +1013,20 @@ namespace Trades {
 						is.read(buffer, length);
 						items = this->parse(this->files[size], std::string(buffer, length));
 						delete[] buffer;
+					} else if (Error::verbose) {
+						std::cerr << "error: " << source << ": length" << std::endl;
 					}
 
 					is.close();
 				}
 
+				if (Error::verbose) {
+					if (items) {
+						std::cout << source << ": " << items << std::endl;
+					} else {
+						std::cerr << "error: " << source << ": 0" << std::endl;
+					}
+				}
 				return items;
 			}
 
@@ -1043,12 +1066,20 @@ namespace Trades {
 
 						if (brewing) {
 							items = brewing->push(*this);
+							if (!items) {
+								std::cerr << "error: " << file.name << ": brewing" << std::endl;
+							}
 							delete brewing;
 						}
 
 						if (crafting) {
 							if (!items) {
 								items = crafting->push(*this);
+								if (!items) {
+									std::cerr << "error: " << file.name << ": crafting" << std::endl;
+								}
+							} else if (Error::verbose) {
+								std::cerr << "error: " << file.name << ": parse" << std::endl;
 							}
 							delete crafting;
 						}
@@ -1056,6 +1087,11 @@ namespace Trades {
 						if (furnace) {
 							if (!items) {
 								items = furnace->push(*this);
+								if (!items) {
+									std::cerr << "error: " << file.name << ": furnace" << std::endl;
+								}
+							} else if (Error::verbose) {
+								std::cerr << "error: " << file.name << ": parse" << std::endl;
 							}
 							delete furnace;
 						}
@@ -1063,6 +1099,11 @@ namespace Trades {
 						if (smithing) {
 							if (!items) {
 								items = smithing->push(*this);
+								if (!items) {
+									std::cerr << "error: " << file.name << ": smithing" << std::endl;
+								}
+							} else if (Error::verbose) {
+								std::cerr << "error: " << file.name << ": parse" << std::endl;
 							}
 							delete smithing;
 						}
@@ -1070,12 +1111,19 @@ namespace Trades {
 						if (villager) {
 							if (!items) {
 								items = villager->push(*this);
+								if (!items) {
+									std::cerr << "error: " << file.name << ": villager" << std::endl;
+								}
+							} else if (Error::verbose) {
+								std::cerr << "error: " << file.name << ": parse" << std::endl;
 							}
 							delete villager;
 						}
 					}
 
 					delete value;
+				} else if (Error::verbose) {
+					std::cerr << "error: " << file.name << ": parse" << std::endl;
 				}
 
 				return items;

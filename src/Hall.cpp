@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (directories.size() > 0) {
-		Trades::Trades trades;
+		Trades::Trades trades(verbose);
 		for (const std::string& directory : directories) {
 			trades.directory(directory);
 		}
