@@ -1,10 +1,24 @@
 #include "Weights.hpp"
 
-Weights::Weights(size_t population, double *weight) :
+Weights::Weights(size_t population, double *weight, const Parameters& parameters) :
 	population(population),
 	weights(2 * population * Items::trades),
-	weight(weight)
+	weight(weight),
+	fitness(new double[population]),
+	parameters(parameters)
 {}
+
+void Weights::fill() noexcept {
+	double sum = this->fitness[0];
+	for (size_t i = 1; i < this->population; ++i) {
+		sum += this->fitness[i];
+		this->fitness[i] = sum;
+	}
+
+	for (size_t i = 0; i < this->population; ++i) {
+		this->fitness[i] /= sum;
+	}
+}
 
 void Weights::fill(double *weights) noexcept {
 	for (size_t i = 0; i < Items::size; ++i) {
@@ -27,6 +41,67 @@ void Weights::fill(double *weights) noexcept {
 
 		for (size_t j = index; j < next; ++j) {
 			weights[Items::trade[j]] *= sum;
+		}
+	}
+}
+
+void Weights::fill(double *child, const double *weights) noexcept {
+	const double value = dis(gen);
+	const double amount = dis(gen);
+	bool index = false;
+	bool next = false;
+	size_t i = 0;
+	size_t j = 0;
+
+	for (size_t k = 0; k < this->population; ++k) {
+		const double fitness = this->fitness[k];
+
+		if (!index && value < fitness) {
+			i = k;
+			index = true;
+		}
+
+		if (!next && amount < fitness) {
+			j = k;
+			next = true;
+		}
+
+		if (index && next) {
+			break;
+		}
+	}
+
+	const double *first = weights + i * Items::trades;
+	const double *second = weights + j * Items::trades;
+	for (size_t k = 0; k < Items::trades; ++k) {
+		if (dis(gen) < 0.5) {
+			child[k] = first[k];
+		} else {
+			child[k] = second[k];
+		}
+
+		if (dis(gen) < this->parameters.mutate) {
+			child[k] += dis(gen);
+		}
+
+		if (child[k] < 0.0) {
+			child[k] = 0.0;
+		} else if (child[k] > 1.0) {
+			child[k] = 1.0;
+		}
+	}
+
+	for (size_t k = 0; k < Items::size; ++k) {
+		double sum = 0.0;
+		const size_t next = Items::item[k].next;
+		for (size_t index = Items::item[k].index; index < next; ++index) {
+			sum += child[Items::trade[index]];
+		}
+
+		if (sum > 1.0) {
+			for (size_t index = Items::item[k].index; index < next; ++index) {
+				child[Items::trade[index]] /= sum;
+			}
 		}
 	}
 }
@@ -59,4 +134,5 @@ std::ostream& operator<<(std::ostream& out, const Weights& weights) {
 
 Weights::~Weights() {
 	delete[] this->weight;
+	delete[] this->fitness;
 }

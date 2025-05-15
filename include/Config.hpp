@@ -4,7 +4,6 @@
 #include <fstream>
 #include "Inventory.hpp"
 #include "JSON.hpp"
-#include "Parameters.hpp"
 #include <string>
 #include <vector>
 #include "Weights.hpp"
@@ -118,7 +117,7 @@ namespace Config {
 				return this->population->size();
 			}
 
-			::Weights *weights() const noexcept {
+			::Weights *weights(const Parameters& parameters) const noexcept {
 				const auto& population = *this->population;
 				const size_t size = population.size();
 
@@ -133,7 +132,7 @@ namespace Config {
 						}
 					}
 
-					return new ::Weights(size, weights);
+					return new ::Weights(size, weights, parameters);
 				}
 
 				return (::Weights *) nullptr;
@@ -211,7 +210,7 @@ namespace Config {
 		return size;
 	}
 
-	static inline bool parse(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source) {
+	static inline bool parse(const std::string& name, Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, bool verbose) {
 		bool config = false;
 
 		if (inventory && parameters && weights) {
@@ -265,12 +264,12 @@ namespace Config {
 
 					const Population *population = Population::is(number(object->get<double, JSON::Number, &JSON::Number::number>("population"), Population::SIZE), object->get<JSON::Array>("weights"));
 					if (population) {
-						*weights = population->weights();
+						*weights = population->weights(**parameters);
 
 						delete population;
 					} else {
 						const Population *population = Population::fill();
-						*weights = population->weights();
+						*weights = population->weights(**parameters);
 						delete population;
 					}
 
@@ -278,9 +277,15 @@ namespace Config {
 				}
 
 				delete value;
+			} else if (verbose) {
+				std::cerr << "error: " << name << ": parse" << std::endl;
 			}
 
 			if (!config) {
+				if (verbose) {
+					std::cerr << "error: " << name << ": config" << std::endl;
+				}
+
 				if (*inventory) {
 					delete *inventory;
 				}
@@ -295,7 +300,7 @@ namespace Config {
 					delete *weights;
 				}
 				const Population *population = Population::fill();
-				*weights = population->weights();
+				*weights = population->weights(**parameters);
 				delete population;
 
 				config = true;
@@ -306,7 +311,7 @@ namespace Config {
 	}
 
 	static inline const size_t MAX_LENGTH = 65536;
-	static bool file(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source) {
+	static bool file(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, bool verbose) {
 		bool config = false;
 
 		std::ifstream is(source, std::ifstream::binary);
@@ -318,11 +323,15 @@ namespace Config {
 			if (length <= MAX_LENGTH) {
 				char *buffer = new char[length];
 				is.read(buffer, length);
-				config = parse(inventory, parameters, weights, std::string(buffer, length));
+				config = parse(source, inventory, parameters, weights, std::string(buffer, length), verbose);
 				delete[] buffer;
+			} else {
+				std::cerr << "error: " << source << ": length" << std::endl;
 			}
 
 			is.close();
+		} else {
+			std::cerr << "error: " << source << ": file" << std::endl;
 		}
 
 		return config;

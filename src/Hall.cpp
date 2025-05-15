@@ -2,8 +2,40 @@
 #include "Trade.hpp"
 #include "Trades.hpp"
 
+static inline const size_t SIZE = 11;
 template <double *(Weights:: *first)(size_t i) noexcept, const double *(Weights:: *second)() const noexcept>
-inline void fill(size_t bottom, size_t top, Weights& weights) noexcept {
+inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noexcept {
+	if (verbose && weights.population > 0) {
+		double sum = weights.fitness[0];
+		double min = sum;
+		double max = sum;
+		for (size_t i = 1; i < weights.population; ++i) {
+			const double value = weights.fitness[i];
+			sum += value;
+
+			if (value < min) {
+				min = value;
+			}
+
+			if (value > max) {
+				max = value;
+			}
+		}
+
+		std::ostringstream out;
+		out << "\t" << min;
+		while (out.str().size() < SIZE) {
+			out << " ";
+		}
+
+		out << "\t" << (sum / weights.population);
+		while (out.str().size() < 2 * SIZE) {
+			out << " ";
+		}
+
+		out << "\t" << max;
+		std::cout << out.str() << std::endl;
+	}
 	weights.fill();
 
 	size_t i = 0;
@@ -37,15 +69,15 @@ inline void trade(Inventory& inventory, const Parameters& parameters, Weights& w
 	}
 }
 
-inline void train(Inventory& inventory, const Parameters& parameters, Weights& weights) noexcept {
+inline void train(Inventory& inventory, const Parameters& parameters, Weights& weights, bool verbose) noexcept {
 	const size_t bottom = (size_t) (parameters.bottom * (double) weights.population);
 	const size_t top = bottom + (size_t) (parameters.top * (double) weights.population);
 	for (size_t i = 0; i < parameters.train; ++i) {
 		trade<&Weights::first>(inventory, parameters, weights);
-		fill<&Weights::second, &Weights::first>(bottom, top, weights);
+		fill<&Weights::second, &Weights::first>(bottom, top, weights, verbose);
 
 		trade<&Weights::second>(inventory, parameters, weights);
-		fill<&Weights::first, &Weights::second>(bottom, top, weights);
+		fill<&Weights::first, &Weights::second>(bottom, top, weights, verbose);
 	}
 }
 
@@ -74,11 +106,11 @@ inline bool train(const std::string& file, bool verbose) noexcept {
 	Inventory *inventory = (Inventory *) nullptr;
 	const Parameters *parameters = (Parameters *) nullptr;
 	Weights *weights = (Weights *) nullptr;
-	if (Config::file(&inventory, &parameters, &weights, file)) {
+	if (Config::file(&inventory, &parameters, &weights, file, verbose)) {
 		if (verbose) {
 			Config::print(std::cout, *inventory, *parameters, *weights);
 		}
-		train(*inventory, *parameters, *weights);
+		train(*inventory, *parameters, *weights, verbose);
 
 		delete inventory;
 		delete parameters;

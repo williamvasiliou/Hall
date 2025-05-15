@@ -1013,11 +1013,13 @@ namespace Trades {
 						is.read(buffer, length);
 						items = this->parse(this->files[size], std::string(buffer, length));
 						delete[] buffer;
-					} else if (Error::verbose) {
+					} else {
 						std::cerr << "error: " << source << ": length" << std::endl;
 					}
 
 					is.close();
+				} else {
+					std::cerr << "error: " << source << ": file" << std::endl;
 				}
 
 				if (Error::verbose) {

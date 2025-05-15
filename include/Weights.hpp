@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include "Items.hpp"
+#include "Parameters.hpp"
 #include <random>
 
 namespace Config {
@@ -55,7 +56,9 @@ class Weights {
 		~Weights();
 
 	private:
-		explicit Weights(size_t population, double *weight);
+		explicit Weights(size_t population, double *weight, const Parameters& parameters);
+
+		const Parameters& parameters;
 
 		friend class Config::Population;
 };
