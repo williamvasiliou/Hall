@@ -49,7 +49,8 @@ class Weights {
 		static inline constexpr double UNIT = 1e-6;
 		void fill() noexcept;
 		static void fill(double *weights) noexcept;
-		void fill(double *child, const double *weights) noexcept;
+		void fill(double *child, const double *weights) const noexcept;
+		void fill(double *child, const double *weights, size_t i) const noexcept;
 
 		friend std::ostream& operator<<(std::ostream& out, const Weights& weights);
 
@@ -59,6 +60,8 @@ class Weights {
 		explicit Weights(size_t population, double *weight, const Parameters& parameters);
 
 		const Parameters& parameters;
+
+		void mutate(double *child, size_t index, size_t next) const noexcept;
 
 		friend class Config::Population;
 };

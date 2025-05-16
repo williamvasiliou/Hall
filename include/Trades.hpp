@@ -112,6 +112,13 @@ namespace Trades {
 					if (tag) {
 						return new Item(tag, &Item::fallback);
 					}
+
+					const JSON::Array *choice = object->get<JSON::Array>("choice");
+					if (!choice) {
+						std::cerr << "error: Item" << std::endl;
+					}
+				} else {
+					std::cerr << "error: Item" << std::endl;
 				}
 
 				return (Item *) nullptr;
@@ -120,6 +127,7 @@ namespace Trades {
 			static const Item *is(const JSON::Object *object, const std::string *string) {
 				if (object) {
 					if (string) {
+						std::cerr << "error: Item" << std::endl;
 						return (Item *) nullptr;
 					} else {
 						return Item::is(object);
@@ -128,6 +136,7 @@ namespace Trades {
 					return new Item(string, &Item::fallback);
 				}
 
+				std::cerr << "error: Item" << std::endl;
 				return (Item *) nullptr;
 			}
 
@@ -147,12 +156,23 @@ namespace Trades {
 			static inline const Item *is(const std::string *item, const double *count, const double *quantity) {
 				if (count) {
 					if (quantity) {
+						std::cerr << "error: Item" << std::endl;
 						return (Item *) nullptr;
 					} else {
-						return new Item(item, count);
+						if (*count > 0.0) {
+							return new Item(item, count);
+						} else {
+							std::cerr << "error: Item: count" << std::endl;
+							return (Item *) nullptr;
+						}
 					}
 				} else if (quantity) {
-					return new Item(item, quantity);
+					if (*quantity > 0.0) {
+						return new Item(item, quantity);
+					} else {
+						std::cerr << "error: Item: quantity" << std::endl;
+						return (Item *) nullptr;
+					}
 				}
 
 				return new Item(item, &Item::fallback);
@@ -180,6 +200,7 @@ namespace Trades {
 					}
 				}
 
+				std::cerr << "error: Choice" << std::endl;
 				return (Choice *) nullptr;
 			}
 
@@ -220,6 +241,9 @@ namespace Trades {
 					}
 				}
 
+				if (object) {
+					std::cerr << "error: Trade" << std::endl;
+				}
 				return (Trade *) nullptr;
 			}
 
@@ -304,6 +328,9 @@ namespace Trades {
 					delete trades;
 				}
 
+				if (object) {
+					std::cerr << "error: Group" << std::endl;
+				}
 				return (Group *) nullptr;
 			}
 
@@ -340,6 +367,9 @@ namespace Trades {
 					}
 				}
 
+				if (object) {
+					std::cerr << "error: Tier" << std::endl;
+				}
 				return (Tier *) nullptr;
 			}
 
@@ -415,6 +445,7 @@ namespace Trades {
 					if (in->size() == wants && out->size() == gives) {
 						return new Items(in, out);
 					}
+					std::cerr << "error: Items" << std::endl;
 
 					for (const auto& item : *in) {
 						delete item;
@@ -469,12 +500,16 @@ namespace Trades {
 
 	class Container {
 		public:
+			static inline const std::string name{"minecraft:recipe_brewing_container"};
 			static const Container *is(const JSON::Object *object) {
 				const Items<2, 1> *items = Items<2, 1>::is(object, Container::first, Container::second);
 				if (items) {
 					return new Container(items);
 				}
 
+				if (object) {
+					std::cerr << "error: Container" << std::endl;
+				}
 				return (Container *) nullptr;
 			}
 
@@ -499,12 +534,16 @@ namespace Trades {
 
 	class Mix {
 		public:
+			static inline const std::string name{"minecraft:recipe_brewing_mix"};
 			static const Mix *is(const JSON::Object *object) {
 				const Items<2, 1> *items = Items<2, 1>::is(object, Mix::first, Mix::second);
 				if (items) {
 					return new Mix(items);
 				}
 
+				if (object) {
+					std::cerr << "error: Mix" << std::endl;
+				}
 				return (Mix *) nullptr;
 			}
 
@@ -555,6 +594,7 @@ namespace Trades {
 					delete items;
 				}
 
+				std::cerr << "error: Key" << std::endl;
 				return (Key *) nullptr;
 			}
 
@@ -592,6 +632,7 @@ namespace Trades {
 					}
 				}
 
+				std::cerr << "error: Result" << std::endl;
 				return (Result *) nullptr;
 			}
 
@@ -618,6 +659,7 @@ namespace Trades {
 
 	class Shaped {
 		public:
+			static inline const std::string name{"minecraft:recipe_shaped"};
 			static const Shaped *is(const JSON::Object *object) {
 				if (object) {
 					const JSON::Array *pattern = object->get<JSON::Array>("pattern");
@@ -645,6 +687,9 @@ namespace Trades {
 					}
 				}
 
+				if (object) {
+					std::cerr << "error: Shaped" << std::endl;
+				}
 				return (Shaped *) nullptr;
 			}
 
@@ -688,6 +733,7 @@ namespace Trades {
 
 	class Shapeless {
 		public:
+			static inline const std::string name{"minecraft:recipe_shapeless"};
 			static const Shapeless *is(const JSON::Object *object) {
 				const Array<Item> *ingredients = Array<Item>::is(object, "ingredients");
 				if (ingredients) {
@@ -698,6 +744,9 @@ namespace Trades {
 					delete ingredients;
 				}
 
+				if (object) {
+					std::cerr << "error: Shapeless" << std::endl;
+				}
 				return (Shapeless *) nullptr;
 			}
 
@@ -733,12 +782,16 @@ namespace Trades {
 
 	class Transform {
 		public:
+			static inline const std::string name{"minecraft:recipe_smithing_transform"};
 			static const Transform *is(const JSON::Object *object) {
 				const Items<2, 1> *items = Items<2, 1>::is(object, Transform::first, Transform::second);
 				if (items) {
 					return new Transform(items);
 				}
 
+				if (object) {
+					std::cerr << "error: Transform" << std::endl;
+				}
 				return (Transform *) nullptr;
 			}
 
@@ -763,12 +816,16 @@ namespace Trades {
 
 	class Trim {
 		public:
+			static inline const std::string name{"minecraft:recipe_smithing_trim"};
 			static const Trim *is(const JSON::Object *object) {
 				const Items<3, 1> *items = Items<3, 1>::is(object, Trim::first, Trim::second);
 				if (items) {
 					return new Trim(items);
 				}
 
+				if (object) {
+					std::cerr << "error: Trim" << std::endl;
+				}
 				return (Trim *) nullptr;
 			}
 
@@ -794,12 +851,13 @@ namespace Trades {
 	template <typename T, typename U>
 	class Recipe {
 		public:
-			static inline const Recipe *is(const JSON::Object *object, const std::string& name, const std::string& key) {
+			static inline const Recipe *is(const JSON::Object *object) {
 				if (object) {
-					const T *first = T::is(object->get<JSON::Object>(name));
-					const U *second = U::is(object->get<JSON::Object>(key));
+					const T *first = T::is(object->get<JSON::Object>(T::name));
+					const U *second = U::is(object->get<JSON::Object>(U::name));
 					if (first) {
 						if (second) {
+							std::cerr << "error: Recipe" << std::endl;
 							delete first;
 							delete second;
 						} else {
@@ -808,6 +866,8 @@ namespace Trades {
 					} else if (second) {
 						return new Recipe(second);
 					}
+				} else {
+					std::cerr << "error: Recipe" << std::endl;
 				}
 
 				return (Recipe *) nullptr;
@@ -848,7 +908,7 @@ namespace Trades {
 	class Brewing {
 		public:
 			static inline const Brewing *is(const JSON::Object *object) {
-				const Recipe<Container, Mix> *recipe = Recipe<Container, Mix>::is(object, "minecraft:recipe_brewing_container", "minecraft:recipe_brewing_mix");
+				const Recipe<Container, Mix> *recipe = Recipe<Container, Mix>::is(object);
 				if (recipe) {
 					return new Brewing(recipe);
 				}
@@ -876,7 +936,7 @@ namespace Trades {
 	class Crafting {
 		public:
 			static inline const Crafting *is(const JSON::Object *object) {
-				const Recipe<Shaped, Shapeless> *recipe = Recipe<Shaped, Shapeless>::is(object, "minecraft:recipe_shaped", "minecraft:recipe_shapeless");
+				const Recipe<Shaped, Shapeless> *recipe = Recipe<Shaped, Shapeless>::is(object);
 				if (recipe) {
 					return new Crafting(recipe);
 				}
@@ -903,9 +963,10 @@ namespace Trades {
 
 	class Furnace {
 		public:
+			static inline const std::string name{"minecraft:recipe_furnace"};
 			static inline const Furnace *is(const JSON::Object *object) {
 				if (object) {
-					const Items<1, 1> *items = Items<1, 1>::is(object->get<JSON::Object>("minecraft:recipe_furnace"), Furnace::first, Furnace::second);
+					const Items<1, 1> *items = Items<1, 1>::is(object->get<JSON::Object>(Furnace::name), Furnace::first, Furnace::second);
 					if (items) {
 						return new Furnace(items);
 					}
@@ -937,7 +998,7 @@ namespace Trades {
 	class Smithing {
 		public:
 			static inline const Smithing *is(const JSON::Object *object) {
-				const Recipe<Transform, Trim> *recipe = Recipe<Transform, Trim>::is(object, "minecraft:recipe_smithing_transform", "minecraft:recipe_smithing_trim");
+				const Recipe<Transform, Trim> *recipe = Recipe<Transform, Trim>::is(object);
 				if (recipe) {
 					return new Smithing(recipe);
 				}

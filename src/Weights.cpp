@@ -45,7 +45,7 @@ void Weights::fill(double *weights) noexcept {
 	}
 }
 
-void Weights::fill(double *child, const double *weights) noexcept {
+void Weights::fill(double *child, const double *weights) const noexcept {
 	const double value = dis(gen);
 	const double amount = dis(gen);
 	bool index = false;
@@ -79,28 +79,51 @@ void Weights::fill(double *child, const double *weights) noexcept {
 		} else {
 			child[k] = second[k];
 		}
-
-		if (dis(gen) < this->parameters.mutate) {
-			child[k] += dis(gen);
-		}
-
-		if (child[k] < 0.0) {
-			child[k] = 0.0;
-		} else if (child[k] > 1.0) {
-			child[k] = 1.0;
-		}
 	}
 
 	for (size_t k = 0; k < Items::size; ++k) {
 		double sum = 0.0;
+
+		const size_t index = Items::item[k].index;
 		const size_t next = Items::item[k].next;
-		for (size_t index = Items::item[k].index; index < next; ++index) {
-			sum += child[Items::trade[index]];
+		for (size_t l = index; l < next; ++l) {
+			sum += child[Items::trade[l]];
 		}
 
 		if (sum > 1.0) {
-			for (size_t index = Items::item[k].index; index < next; ++index) {
-				child[Items::trade[index]] /= sum;
+			sum = dis(gen) / sum;
+			for (size_t l = index; l < next; ++l) {
+				child[Items::trade[l]] *= sum;
+			}
+		}
+
+		Weights::mutate(child, index, next);
+	}
+}
+
+void Weights::fill(double *child, const double *weights, size_t i) const noexcept {
+	const double *weight = weights + i * Items::trades;
+	for (size_t j = 0; j < Items::trades; ++j) {
+		child[j] = weight[j];
+	}
+}
+
+inline void Weights::mutate(double *child, size_t index, size_t next) const noexcept {
+	for (size_t i = index; i < next; ++i) {
+		if (dis(gen) < this->parameters.mutate) {
+			const double weight = child[Items::trade[i]];
+
+			double sum = 1.0;
+			for (size_t j = index; j < next; ++j) {
+				sum -= child[Items::trade[j]];
+			}
+
+			if (weight + sum > Weights::UNIT) {
+				if (dis(gen) < sum / (weight + sum)) {
+					child[Items::trade[i]] += sum * dis(gen) * dis(gen) * dis(gen);
+				} else {
+					child[Items::trade[i]] -= weight * dis(gen) * dis(gen) * dis(gen);
+				}
 			}
 		}
 	}

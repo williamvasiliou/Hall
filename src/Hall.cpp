@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "Config.hpp"
 #include "Trade.hpp"
 #include "Trades.hpp"
@@ -5,7 +6,7 @@
 static inline const size_t SIZE = 11;
 template <double *(Weights:: *first)(size_t i) noexcept, const double *(Weights:: *second)() const noexcept>
 inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noexcept {
-	if (verbose && weights.population > 0) {
+	if (verbose) {
 		double sum = weights.fitness[0];
 		double min = sum;
 		double max = sum;
@@ -36,7 +37,6 @@ inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noex
 		out << "\t" << max;
 		std::cout << out.str() << std::endl;
 	}
-	weights.fill();
 
 	size_t i = 0;
 	while (i < bottom) {
@@ -44,9 +44,22 @@ inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noex
 		++i;
 	}
 
+	std::vector<std::pair<size_t, double>> vector;
+	size_t j = 0;
+	while (j < weights.population) {
+		vector.push_back({j, weights.fitness[j]});
+		++j;
+	}
+	std::sort(vector.begin(), vector.end(), [](auto& index, auto& next) {
+		return index.second > next.second;
+	});
+	weights.fill();
+
+	j = 0;
 	while (i < top) {
-		weights.fill((weights.*first)(i), (weights.*second)());
+		weights.fill((weights.*first)(i), (weights.*second)(), vector[j].first);
 		++i;
+		++j;
 	}
 
 	while (i < weights.population) {
@@ -225,15 +238,15 @@ int main(int argc, char *argv[]) {
 		}
 		Trades::Commit commit(trades);
 
-		std::ofstream Items("./include/Items.hpp");
+		std::ofstream Items("include/Items.hpp");
 		commit.Items(Items);
 		Items.close();
 
-		std::ofstream Trade("./include/Trade.hpp");
+		std::ofstream Trade("include/Trade.hpp");
 		commit.Trade(Trade);
 		Trade.close();
 
-		std::ofstream Document("./docs/README.md");
+		std::ofstream Document("docs/README.md");
 		commit.Document(Document);
 		Document.close();
 	} else if (file.size() > 0) {
