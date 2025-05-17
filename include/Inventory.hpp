@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include "Items.hpp"
+#include <vector>
 
 class Inventory {
 	public:
@@ -16,6 +17,10 @@ class Inventory {
 
 		void commit();
 		void restore();
+
+		void restore(size_t index);
+		void population(size_t population, size_t trades);
+		void trade(size_t trade, double amount);
 
 		inline double fitness() const noexcept {
 			return this->in[Items::minecraft::emerald];
@@ -36,6 +41,9 @@ class Inventory {
 
 		double in[Items::size];
 		double out[Items::size];
+
+		std::vector<std::vector<std::pair<size_t, double>>> *weight;
+		size_t index;
 };
 
 #endif // INVENTORY_H

@@ -91,7 +91,12 @@ void Weights::fill(double *child, const double *weights) const noexcept {
 		}
 
 		if (sum > 1.0) {
-			sum = dis(gen) / sum;
+			double value = 0.0;
+			for (size_t l = index; l < next; ++l) {
+				value += first[Items::trade[l]] + second[Items::trade[l]];
+			}
+
+			sum = value / (2.0 * sum);
 			for (size_t l = index; l < next; ++l) {
 				child[Items::trade[l]] *= sum;
 			}
