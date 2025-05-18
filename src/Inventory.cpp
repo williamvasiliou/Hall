@@ -67,21 +67,6 @@ void Inventory::restore(size_t index) {
 	}
 }
 
-void Inventory::population(size_t population, size_t trades) {
-	if (this->weight) {
-		delete this->weight;
-	}
-	this->weight = new std::vector<std::vector<std::pair<size_t, double>>>();
-
-	for (size_t i = 0; i < population; ++i) {
-		std::vector<std::pair<size_t, double>> vector;
-		for (size_t j = 0; j < trades; ++j) {
-			vector.push_back({j, 0.0});
-		}
-		this->weight->push_back(vector);
-	}
-}
-
 void Inventory::trade(size_t trade, double amount) {
 	(*this->weight)[this->index][trade].second = amount;
 }
@@ -128,4 +113,8 @@ std::ostream& operator<<(std::ostream& out, const Inventory& inventory) {
 Inventory::~Inventory() {
 	delete[] this->items;
 	delete[] this->rate;
+
+	if (this->weight) {
+		delete this->weight;
+	}
 }

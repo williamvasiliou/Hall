@@ -17,10 +17,40 @@ class Inventory {
 
 		void commit();
 		void restore();
-
 		void restore(size_t index);
-		void population(size_t population, size_t trades);
+
+		template <size_t trades>
+		inline void population(size_t population) {
+			if (this->weight) {
+				delete this->weight;
+			}
+			this->weight = new std::vector<std::vector<std::pair<size_t, double>>>();
+
+			for (size_t i = 0; i < population; ++i) {
+				std::vector<std::pair<size_t, double>> vector;
+				for (size_t j = 0; j < trades; ++j) {
+					vector.push_back({j, 0.0});
+				}
+				this->weight->push_back(vector);
+			}
+		}
 		void trade(size_t trade, double amount);
+
+		inline const std::vector<std::pair<size_t, double>>& checkout() const noexcept {
+			return (*this->weight)[this->index];
+		}
+
+		inline std::vector<std::pair<size_t, double>>& checkout() noexcept {
+			return (*this->weight)[this->index];
+		}
+
+		inline const std::vector<std::pair<size_t, double>>& checkout(size_t index) const noexcept {
+			return (*this->weight)[index];
+		}
+
+		inline std::vector<std::pair<size_t, double>>& checkout(size_t index) noexcept {
+			return (*this->weight)[index];
+		}
 
 		inline double fitness() const noexcept {
 			return this->in[Items::minecraft::emerald];
