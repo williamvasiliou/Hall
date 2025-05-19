@@ -2,10 +2,12 @@
 #define PARAMETERS_H
 
 #include <iostream>
+#include "Options.hpp"
 
 class Parameters {
 	public:
 		static const Parameters *is(double bottom, double mutate, double top, size_t trade, size_t train);
+		static const Parameters *is(const Options& options);
 
 		const double bottom;
 		const double mutate;
