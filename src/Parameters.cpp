@@ -36,6 +36,16 @@ const Parameters *Parameters::is(double bottom, double mutate, double top, size_
 	return new Parameters(bottom, mutate, top, trade, train);
 }
 
+const Parameters *Parameters::is(const Options& options) {
+	return Parameters::is(
+		options.get<double, Options::BOTTOM, &Options::bottom>(Parameters::BOTTOM),
+		options.get<double, Options::MUTATE, &Options::mutate>(Parameters::MUTATE),
+		options.get<double, Options::TOP, &Options::top>(Parameters::TOP),
+		options.get<size_t, Options::TRADE, &Options::trade>(Parameters::TRADE),
+		options.get<size_t, Options::TRAIN, &Options::train>(Parameters::TRAIN)
+	);
+}
+
 Parameters::Parameters(double bottom, double mutate, double top, size_t trade, size_t train) :
 	bottom(bottom),
 	mutate(mutate),
