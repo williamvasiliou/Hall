@@ -6,98 +6,63 @@
 #include <set>
 #include <string>
 
-class Options {
+template <typename T>
+class Option {
 	public:
-		static inline const size_t BOTTOM = 0;
-		static inline const size_t MUTATE = 1;
-		static inline const size_t TOP = 2;
-		static inline const size_t TRADE = 3;
-		static inline const size_t TRAIN = 4;
+		inline operator bool() const noexcept {
+			return this->is;
+		}
 
-		template <typename T, size_t index>
-		inline const T& get(const T& value) const noexcept;
-
-		template <typename T, size_t index>
-		inline void set(const T& value) noexcept;
-
-		~Options();
-
-	private:
-		explicit Options();
-
-		double bottom;
-		double mutate;
-		double top;
-		size_t trade;
-		size_t train;
-
-		static inline const size_t SIZE = 5;
-		std::array<bool, SIZE> is;
-
-		template <typename T, size_t index, const T Options:: *data>
-		inline const T& get(const T& value) const noexcept {
-			if (this->is[index]) {
-				return this->*data;
+		inline const T& operator()(const T& value) const noexcept {
+			if (this->is) {
+				return this->value;
 			}
 
 			return value;
 		}
 
-		template <typename T, size_t index, T Options:: *data>
-		inline void set(const T& value) noexcept {
-			this->*data = value;
-			this->is[index] = true;
+		inline void operator=(const T& value) noexcept {
+			this->value = value;
+			this->is = true;
 		}
+
+		inline void operator=(const char *value) noexcept;
+
+	private:
+		explicit Option(const T& value);
+
+		T value;
+		bool is;
+
+		~Option();
+
+		friend class Options;
 };
 
 template <>
-inline const double& Options::get<double, Options::BOTTOM>(const double& value) const noexcept {
-	return this->get<double, Options::BOTTOM, &Options::bottom>(value);
+inline void Option<double>::operator=(const char *value) noexcept {
+	this->value = std::strtod(value, (char **) nullptr);
+	this->is = true;
 }
 
 template <>
-inline const double& Options::get<double, Options::MUTATE>(const double& value) const noexcept {
-	return this->get<double, Options::MUTATE, &Options::mutate>(value);
+inline void Option<size_t>::operator=(const char *value) noexcept {
+	this->value = std::strtoul(value, (char **) nullptr, 10);
+	this->is = true;
 }
 
-template <>
-inline const double& Options::get<double, Options::TOP>(const double& value) const noexcept {
-	return this->get<double, Options::TOP, &Options::top>(value);
-}
+class Options {
+	public:
+		Option<double> bottom;
+		Option<double> mutate;
+		Option<double> top;
+		Option<size_t> trade;
+		Option<size_t> train;
 
-template <>
-inline const size_t& Options::get<size_t, Options::TRADE>(const size_t& value) const noexcept {
-	return this->get<size_t, Options::TRADE, &Options::trade>(value);
-}
+		~Options();
 
-template <>
-inline const size_t& Options::get<size_t, Options::TRAIN>(const size_t& value) const noexcept {
-	return this->get<size_t, Options::TRAIN, &Options::train>(value);
-}
-
-template <>
-inline void Options::set<double, Options::BOTTOM>(const double& value) noexcept {
-	return this->set<double, Options::BOTTOM, &Options::bottom>(value);
-}
-
-template <>
-inline void Options::set<double, Options::MUTATE>(const double& value) noexcept {
-	return this->set<double, Options::MUTATE, &Options::mutate>(value);
-}
-
-template <>
-inline void Options::set<double, Options::TOP>(const double& value) noexcept {
-	return this->set<double, Options::TOP, &Options::top>(value);
-}
-
-template <>
-inline void Options::set<size_t, Options::TRADE>(const size_t& value) noexcept {
-	return this->set<size_t, Options::TRADE, &Options::trade>(value);
-}
-
-template <>
-inline void Options::set<size_t, Options::TRAIN>(const size_t& value) noexcept {
-	return this->set<size_t, Options::TRAIN, &Options::train>(value);
-}
+	private:
+		explicit Options();
+};
 
 #endif // OPTIONS_H
