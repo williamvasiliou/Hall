@@ -99,18 +99,63 @@ namespace Trades {
 
 	class Item {
 		public:
+			template <size_t next>
+			static inline bool find(const std::string& item) noexcept {
+				const size_t size = item.size();
+				if (size > next) {
+					const char c = item[next];
+					if (isalpha(c) || c == '_') {
+						for (size_t i = next + 1; i < size; ++i) {
+							const char c = item[i];
+							if (c == ':') {
+								break;
+							}
+
+							if (!isalnum(c) && c != '_') {
+								return false;
+							}
+						}
+
+						return true;
+					}
+				}
+
+				return false;
+			}
+
+			static inline bool good(const std::string& item) noexcept {
+				const size_t index = item.find("minecraft:");
+				if (index == std::string::npos) {
+					return Item::find<0>(item);
+				} else if (index == 0) {
+					return Item::find<10>(item);
+				}
+
+				return false;
+			}
+
 			static const Item *is(const JSON::Object *object) {
 				if (object) {
 					const std::string *item = object->get<std::string, JSON::String, &JSON::String::string>("item");
 					if (item) {
-						const double *count = object->get<double, JSON::Number, &JSON::Number::number>("count");
-						const double *quantity = object->get<double, JSON::Number, &JSON::Number::number>("quantity");
-						return Item::is(item, count, quantity);
+						if (Item::good(*item)) {
+							const double *count = object->get<double, JSON::Number, &JSON::Number::number>("count");
+							const double *quantity = object->get<double, JSON::Number, &JSON::Number::number>("quantity");
+							return Item::is(item, count, quantity);
+						} else {
+							std::cerr << "error: Item: item" << std::endl;
+							return (Item *) nullptr;
+						}
 					}
 
 					const std::string *tag = object->get<std::string, JSON::String, &JSON::String::string>("tag");
 					if (tag) {
-						return new Item(tag, &Item::fallback);
+						if (Item::good(*tag)) {
+							return new Item(tag, &Item::fallback);
+						} else {
+							std::cerr << "error: Item: item" << std::endl;
+							return (Item *) nullptr;
+						}
 					}
 
 					const JSON::Array *choice = object->get<JSON::Array>("choice");
@@ -133,7 +178,12 @@ namespace Trades {
 						return Item::is(object);
 					}
 				} else if (string) {
-					return new Item(string, &Item::fallback);
+					if (Item::good(*string)) {
+						return new Item(string, &Item::fallback);
+					} else {
+						std::cerr << "error: Item: item" << std::endl;
+						return (Item *) nullptr;
+					}
 				}
 
 				std::cerr << "error: Item" << std::endl;
@@ -1205,6 +1255,11 @@ namespace Trades {
 		std::vector<double> quantity;
 	} Index;
 
+	typedef struct {
+		Index items;
+		Index trade;
+	} Sum;
+
 	class Commit {
 		public:
 			explicit Commit(const Trades& trades) {
@@ -1231,9 +1286,11 @@ namespace Trades {
 				}
 
 				std::map<std::string, size_t> index;
+				std::vector<std::map<size_t, double>> items;
 				size_t i = 0;
 				for (const auto& item : this->items) {
 					index[item] = i;
+					items.push_back(std::map<size_t, double>());
 					++i;
 				}
 
@@ -1242,6 +1299,8 @@ namespace Trades {
 				for (const auto& pair : this->trades) {
 					this->size += pair.second.size();
 					for (const auto& trade : pair.second) {
+						std::map<size_t, double> sum;
+
 						if (i > 0) {
 							const size_t index = this->in.next[i - 1];
 							this->in.index.push_back(index);
@@ -1256,6 +1315,8 @@ namespace Trades {
 							this->index[first].push_back(this->in.item.size());
 							this->in.item.push_back(first);
 							this->in.quantity.push_back(in.second);
+							sum[first] -= in.second;
+							items[first][i] -= in.second;
 
 							for (const auto& out : trade.out) {
 								this->predecessors[out.first].insert(in.first);
@@ -1273,12 +1334,47 @@ namespace Trades {
 						}
 
 						for (const auto& out : trade.out) {
-							this->out.item.push_back(index.at(out.first));
+							const size_t first = index.at(out.first);
+							this->out.item.push_back(first);
 							this->out.quantity.push_back(out.second);
+							sum[first] += out.second;
+							items[first][i] += out.second;
+						}
+
+						if (i > 0) {
+							const size_t index = this->sum.trade.next[i - 1];
+							this->sum.trade.index.push_back(index);
+							this->sum.trade.next.push_back(index + sum.size());
+						} else {
+							this->sum.trade.index.push_back(0);
+							this->sum.trade.next.push_back(sum.size());
+						}
+
+						for (const auto& pair : sum) {
+							this->sum.trade.item.push_back(pair.first);
+							this->sum.trade.quantity.push_back(pair.second);
 						}
 
 						++i;
 					}
+				}
+
+				i = 0;
+				for (const auto& item : items) {
+					if (i > 0) {
+						const size_t index = this->sum.items.next[i - 1];
+						this->sum.items.index.push_back(index);
+						this->sum.items.next.push_back(index + item.size());
+					} else {
+						this->sum.items.index.push_back(0);
+						this->sum.items.next.push_back(item.size());
+					}
+
+					for (const auto& pair : item) {
+						this->sum.items.item.push_back(pair.first);
+						this->sum.items.quantity.push_back(pair.second);
+					}
+					++i;
 				}
 
 				const size_t size = this->items.size();
@@ -1302,7 +1398,7 @@ namespace Trades {
 				out << "#ifndef ITEMS_H" << std::endl;
 				out << "#define ITEMS_H" << std::endl;
 				out << std::endl;
-				out << "#include <cstdint>" << std::endl;
+				out << "#include <cstddef>" << std::endl;
 				out << "#include <string>" << std::endl;
 				out << std::endl;
 				out << "namespace Items {" << std::endl;
@@ -1340,6 +1436,8 @@ namespace Trades {
 				out << "\tstatic const size_t trade[trades] = {" << std::endl;
 				this->insert(out, this->trade, "\t\t");
 				out << "\t};" << std::endl;
+				out << std::endl;
+				this->insert(out, "sum", "Items::size", this->sum.items);
 				out << "} // namespace Items" << std::endl;
 				out << std::endl;
 				out << "#endif // ITEMS_H" << std::endl;
@@ -1355,8 +1453,9 @@ namespace Trades {
 				out << "namespace Trade {" << std::endl;
 				out << "\tstatic inline const size_t trades = " << this->size << ";" << std::endl;
 				out << std::endl;
-				this->insert(out, "in", this->in) << std::endl;
-				this->insert(out, "out", this->out) << std::endl;
+				this->insert(out, "in", "trades", this->in) << std::endl;
+				this->insert(out, "out", "trades", this->out) << std::endl;
+				this->insert(out, "sum", "trades", this->sum.trade);
 				out << "} // namespace Trade" << std::endl;
 				out << std::endl;
 				out << "#endif // TRADE_H" << std::endl;
@@ -1414,6 +1513,7 @@ namespace Trades {
 			std::map<std::string, std::vector<AbstractTrade>> trades;
 			Index in;
 			Index out;
+			Sum sum;
 			std::map<std::string, std::set<std::string>> predecessors;
 			std::map<std::string, std::set<std::string>> successors;
 
@@ -1522,13 +1622,13 @@ namespace Trades {
 				return out;
 			}
 
-			inline std::ostream& insert(std::ostream& out, const std::string& name, const Index& index) const noexcept {
+			inline std::ostream& insert(std::ostream& out, const std::string& name, const std::string& size, const Index& index) const noexcept {
 				out << "\tnamespace " << name << " {" << std::endl;
-				out << "\t\tstatic const size_t index[trades] = {" << std::endl;
+				out << "\t\tstatic const size_t index[" << size << "] = {" << std::endl;
 				this->insert(out, index.index, "\t\t\t");
 				out << "\t\t};" << std::endl;
 				out << std::endl;
-				out << "\t\tstatic const size_t next[trades] = {" << std::endl;
+				out << "\t\tstatic const size_t next[" << size << "] = {" << std::endl;
 				this->insert(out, index.next, "\t\t\t");
 				out << "\t\t};" << std::endl;
 				out << std::endl;
