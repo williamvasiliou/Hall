@@ -2,7 +2,6 @@
 #define CONFIG_H
 
 #include <fstream>
-#include "Inventory.hpp"
 #include "JSON.hpp"
 #include <string>
 #include <vector>
@@ -210,7 +209,7 @@ namespace Config {
 		return size;
 	}
 
-	static inline bool parse(const std::string& name, Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, bool verbose) {
+	static inline bool parse(const std::string& name, Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, const Options& options, bool verbose) {
 		bool config = false;
 
 		if (inventory && parameters && weights) {
@@ -256,7 +255,13 @@ namespace Config {
 					if (*parameters) {
 						delete *parameters;
 					}
-					*parameters = Parameters::is(number(object->get<double, JSON::Number, &JSON::Number::number>("bottom"), Parameters::BOTTOM), number(object->get<double, JSON::Number, &JSON::Number::number>("mutate"), Parameters::MUTATE), number(object->get<double, JSON::Number, &JSON::Number::number>("top"), Parameters::TOP), number(object->get<double, JSON::Number, &JSON::Number::number>("trade"), Parameters::TRADE), number(object->get<double, JSON::Number, &JSON::Number::number>("train"), Parameters::TRAIN));
+					*parameters = Parameters::is(
+						options.bottom(number(object->get<double, JSON::Number, &JSON::Number::number>("bottom"), Parameters::BOTTOM)),
+						options.mutate(number(object->get<double, JSON::Number, &JSON::Number::number>("mutate"), Parameters::MUTATE)),
+						options.top(number(object->get<double, JSON::Number, &JSON::Number::number>("top"), Parameters::TOP)),
+						options.trade(number(object->get<double, JSON::Number, &JSON::Number::number>("trade"), Parameters::TRADE)),
+						options.train(number(object->get<double, JSON::Number, &JSON::Number::number>("train"), Parameters::TRAIN))
+					);
 
 					if (*weights) {
 						delete *weights;
@@ -294,7 +299,7 @@ namespace Config {
 				if (*parameters) {
 					delete *parameters;
 				}
-				*parameters = Parameters::is(Parameters::BOTTOM, Parameters::MUTATE, Parameters::TOP, Parameters::TRADE, Parameters::TRAIN);
+				*parameters = Parameters::is(options);
 
 				if (*weights) {
 					delete *weights;
@@ -311,7 +316,7 @@ namespace Config {
 	}
 
 	static inline const size_t MAX_LENGTH = 65536;
-	static bool file(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, bool verbose) {
+	static bool file(Inventory **inventory, const Parameters **parameters, ::Weights **weights, const std::string& source, const Options& options, bool verbose) {
 		bool config = false;
 
 		std::ifstream is(source, std::ifstream::binary);
@@ -323,7 +328,7 @@ namespace Config {
 			if (length <= MAX_LENGTH) {
 				char *buffer = new char[length];
 				is.read(buffer, length);
-				config = parse(source, inventory, parameters, weights, std::string(buffer, length), verbose);
+				config = parse(source, inventory, parameters, weights, std::string(buffer, length), options, verbose);
 				delete[] buffer;
 			} else {
 				std::cerr << "error: " << source << ": length" << std::endl;
