@@ -1,10 +1,53 @@
 #include <algorithm>
 #include "Config.hpp"
-#include "Trade.hpp"
 #include "Trades.hpp"
 
+namespace Trade {
+	static inline const double UNIT = 1e-6;
+	static inline void on(Inventory& inventory, const double *weight, size_t trade) noexcept {
+		size_t index = Trade::in::index[trade];
+		size_t next = Trade::in::next[trade];
+		double amount = (inventory[Trade::in::item[index]] * weight[index]) / Trade::in::quantity[index];
+		while (++index < next) {
+			if (amount < Trade::UNIT) {
+				inventory.trade(trade, 0.0);
+				return;
+			}
+			const double value = (inventory[Trade::in::item[index]] * weight[index]) / Trade::in::quantity[index];
+			if (value < amount) {
+				amount = value;
+			}
+		}
+
+		if (amount >= Trade::UNIT) {
+			index = Trade::in::index[trade];
+			inventory.remove(Trade::in::item[index], Trade::in::quantity[index] * amount);
+			while (++index < next) {
+				inventory.remove(Trade::in::item[index], Trade::in::quantity[index] * amount);
+			}
+
+			index = Trade::out::index[trade];
+			next = Trade::out::next[trade];
+			inventory.add(Trade::out::item[index], Trade::out::quantity[index] * amount);
+			while (++index < next) {
+				inventory.add(Trade::out::item[index], Trade::out::quantity[index] * amount);
+			}
+
+			inventory.trade(trade, amount);
+		} else {
+			inventory.trade(trade, 0.0);
+		}
+	}
+
+	static inline void on(Inventory& inventory, const double *weight) noexcept {
+		for (size_t i = 0; i < trades; ++i) {
+			on(inventory, weight, i);
+		}
+	}
+} // namespace Trade
+
 static inline const size_t SIZE = 11;
-template <double *(Weights:: *first)(size_t i) noexcept, const double *(Weights:: *second)() const noexcept>
+template <double *(Weights:: *first)(size_t i) noexcept, const double *(Weights:: *second)() const noexcept, size_t *amount>
 inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noexcept {
 	if (verbose) {
 		double sum = weights.fitness[0];
@@ -55,6 +98,10 @@ inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noex
 	});
 	weights.fill();
 
+	if (amount) {
+		*amount = vector[0].first;
+	}
+
 	j = 0;
 	while (i < top) {
 		weights.fill((weights.*first)(i), (weights.*second)(), vector[j].first);
@@ -69,8 +116,8 @@ inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noex
 }
 
 template <const double *(Weights:: *first)(size_t i) const noexcept>
-inline void trade(Inventory& inventory, const Parameters& parameters, Weights& weights) noexcept {
-	for (size_t i = 0; i < weights.population; ++i) {
+inline void trade(Inventory& inventory, const Parameters& parameters, Weights& weights, size_t population) noexcept {
+	for (size_t i = 0; i < population; ++i) {
 		const double *weight = (weights.*first)(i);
 		for (size_t j = 0; j < parameters.trade; ++j) {
 			Trade::on(inventory, weight);
@@ -78,48 +125,55 @@ inline void trade(Inventory& inventory, const Parameters& parameters, Weights& w
 		}
 
 		weights.fitness[i] = inventory.fitness();
-		inventory.restore();
+		inventory.restore(i + 1);
 	}
+
+	const double *weight = (weights.*first)(population);
+	for (size_t j = 0; j < parameters.trade; ++j) {
+		Trade::on(inventory, weight);
+		inventory.commit();
+	}
+
+	weights.fitness[population] = inventory.fitness();
+	inventory.restore(0);
 }
 
 inline void train(Inventory& inventory, const Parameters& parameters, Weights& weights, bool verbose) noexcept {
+	inventory.population<Trade::trades>(weights.population);
+
 	const size_t bottom = (size_t) (parameters.bottom * (double) weights.population);
 	const size_t top = bottom + (size_t) (parameters.top * (double) weights.population);
-	for (size_t i = 0; i < parameters.train; ++i) {
-		trade<&Weights::first>(inventory, parameters, weights);
-		fill<&Weights::second, &Weights::first>(bottom, top, weights, verbose);
+	const size_t population = weights.population - 1;
+	for (size_t i = 1; i < parameters.train; ++i) {
+		trade<&Weights::first>(inventory, parameters, weights, population);
+		fill<&Weights::second, &Weights::first, (size_t *) nullptr>(bottom, top, weights, verbose);
 
-		trade<&Weights::second>(inventory, parameters, weights);
-		fill<&Weights::first, &Weights::second>(bottom, top, weights, verbose);
+		trade<&Weights::second>(inventory, parameters, weights, population);
+		fill<&Weights::first, &Weights::second, (size_t *) nullptr>(bottom, top, weights, verbose);
+	}
+
+	trade<&Weights::first>(inventory, parameters, weights, population);
+	fill<&Weights::second, &Weights::first, (size_t *) nullptr>(bottom, top, weights, verbose);
+
+	static size_t amount = 0;
+	trade<&Weights::second>(inventory, parameters, weights, population);
+	fill<&Weights::first, &Weights::second, &amount>(bottom, top, weights, verbose);
+	std::vector<std::pair<size_t, double>>& vector = inventory.checkout(amount);
+	std::sort(vector.begin(), vector.end(), [](auto& index, auto& next) {
+		return index.second > next.second;
+	});
+
+	for (size_t i = 0; i < Trade::trades; ++i) {
+		std::cout << vector[i].first << ": " << vector[i].second << std::endl;
+		Trade::print(std::cout, vector[i].first);
 	}
 }
 
-inline std::ostream& items(std::ostream& out) noexcept {
-	for (size_t i = 0; i < Items::size; ++i) {
-		out << Items::item[i].name << std::endl;
-	}
-	return out;
-}
-
-inline std::ostream& usage(std::ostream& out) noexcept {
-	out << "Usage: Hall [OPTION...] [FILE]..." << std::endl;
-	out << "Options:" << std::endl;
-	out << "  -d, --directory=DIRECTORY  update items and trades from" << std::endl;
-	out << "                               a directory; this option may" << std::endl;
-	out << "                               be specified more than once" << std::endl;
-	out << "  -f, --file=CONFIG          use CONFIG instead of config.json" << std::endl;
-	out << "  -h, --help                 display this help and exit" << std::endl;
-	out << "  -i, --items                display items and exit" << std::endl;
-	out << "  -t, --trades               display trades and exit" << std::endl;
-	out << "  -v, --verbose              be verbose" << std::endl;
-	return out;
-}
-
-inline bool train(const std::string& file, bool verbose) noexcept {
+inline bool train(const std::string& file, const Options& options, bool verbose) noexcept {
 	Inventory *inventory = (Inventory *) nullptr;
 	const Parameters *parameters = (Parameters *) nullptr;
 	Weights *weights = (Weights *) nullptr;
-	if (Config::file(&inventory, &parameters, &weights, file, verbose)) {
+	if (Config::file(&inventory, &parameters, &weights, file, options, verbose)) {
 		if (verbose) {
 			Config::print(std::cout, *inventory, *parameters, *weights);
 		}
@@ -146,91 +200,7 @@ inline bool train(const std::string& file, bool verbose) noexcept {
 	}
 }
 
-int main(int argc, char *argv[]) {
-	std::set<std::string> directories;
-	std::string file = "config.json";
-	bool verbose = false;
-	for (int i = 1; i < argc; ++i) {
-		const std::string string(argv[i]);
-		const size_t size = string.size();
-		if (size > 0 && string[0] == '-') {
-			if (size > 1 && string[1] == '-') {
-				if (string == "--directory") {
-					if (++i < argc) {
-						directories.insert(std::string(argv[i]));
-					}
-				} else if (string.substr(0, 12) == "--directory=") {
-					directories.insert(string.substr(12));
-				} else if (string == "--file") {
-					if (++i < argc) {
-						file = std::string(argv[i]);
-					}
-				} else if (string.substr(0, 7) == "--file=") {
-					file = string.substr(7);
-				} else if (string == "--help") {
-					usage(std::cout);
-					exit(EXIT_SUCCESS);
-				} else if (string == "--items") {
-					items(std::cout);
-					exit(EXIT_SUCCESS);
-				} else if (string == "--trades") {
-					Trade::print(std::cout);
-					exit(EXIT_SUCCESS);
-				} else if (string == "--verbose") {
-					verbose = true;
-				} else {
-					std::cerr << "error: unrecognized command-line option: `" << string << "'" << std::endl;
-					exit(EXIT_FAILURE);
-				}
-			} else {
-				for (size_t j = 1; j < size; ++j) {
-					switch (string[j]) {
-						case 'd':
-							if (j == size - 1) {
-								if (++i < argc) {
-									directories.insert(std::string(argv[i]));
-								}
-							} else {
-								directories.insert(std::string(argv[i] + j + 1));
-							}
-							j = size;
-							break;
-						case 'f':
-							if (j == size - 1) {
-								if (++i < argc) {
-									file = std::string(argv[i]);
-								}
-							} else {
-								file = std::string(argv[i] + j + 1);
-							}
-							j = size;
-							break;
-						case 'h':
-							usage(std::cout);
-							exit(EXIT_SUCCESS);
-							break;
-						case 'i':
-							items(std::cout);
-							exit(EXIT_SUCCESS);
-							break;
-						case 't':
-							Trade::print(std::cout);
-							exit(EXIT_SUCCESS);
-							break;
-						case 'v':
-							verbose = true;
-							break;
-						default:
-							std::cerr << "error: unrecognized command-line option: `-" << string[j] << "'" << std::endl;
-							exit(EXIT_FAILURE);
-					}
-				}
-			}
-		} else {
-			file = string;
-		}
-	}
-
+inline bool good(const std::set<std::string>& directories, const std::string& file, const Options& options, const bool& verbose) {
 	if (directories.size() > 0) {
 		Trades::Trades trades(verbose);
 		for (const std::string& directory : directories) {
@@ -249,13 +219,33 @@ int main(int argc, char *argv[]) {
 		std::ofstream Document("docs/README.md");
 		commit.Document(Document);
 		Document.close();
+
+		return true;
 	} else if (file.size() > 0) {
-		if (train(file, verbose)) {
-			exit(EXIT_SUCCESS);
+		if (train(file, options, verbose)) {
+			return true;
 		} else {
-			exit(EXIT_FAILURE);
+			return false;
 		}
 	} else {
+		return false;
+	}
+}
+
+int main(int argc, char *argv[]) {
+	std::set<std::string> directories;
+	std::string file = "config.json";
+	bool verbose = false;
+	const Options *options = Options::parse(directories, file, verbose, argc, argv);
+
+	if (options && good(directories, file, *options, verbose)) {
+		delete options;
+		exit(EXIT_SUCCESS);
+	} else {
+		if (options) {
+			delete options;
+		}
+
 		exit(EXIT_FAILURE);
 	}
 }
