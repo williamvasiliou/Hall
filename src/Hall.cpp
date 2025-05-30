@@ -3,7 +3,7 @@
 #include "Trades.hpp"
 
 namespace Trade {
-	static inline const double UNIT = 1e-6;
+	static inline constexpr double UNIT = 1e-6;
 	static inline void on(Inventory& inventory, const double *weight, size_t trade) noexcept {
 		size_t index = Trade::in::index[trade];
 		size_t next = Trade::in::next[trade];
@@ -117,7 +117,7 @@ inline void fill(size_t bottom, size_t top, Weights& weights, bool verbose) noex
 
 template <const double *(Weights:: *first)(size_t i) const noexcept>
 inline void trade(Inventory& inventory, const Parameters& parameters, Weights& weights, size_t population) noexcept {
-	for (size_t i = 0; i < population; ++i) {
+	for (size_t i = 0; i < population; inventory.restore(++i)) {
 		const double *weight = (weights.*first)(i);
 		for (size_t j = 0; j < parameters.trade; ++j) {
 			Trade::on(inventory, weight);
@@ -125,11 +125,10 @@ inline void trade(Inventory& inventory, const Parameters& parameters, Weights& w
 		}
 
 		weights.fitness[i] = inventory.fitness();
-		inventory.restore(i + 1);
 	}
 
 	const double *weight = (weights.*first)(population);
-	for (size_t j = 0; j < parameters.trade; ++j) {
+	for (size_t i = 0; i < parameters.trade; ++i) {
 		Trade::on(inventory, weight);
 		inventory.commit();
 	}
