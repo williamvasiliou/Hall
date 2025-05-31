@@ -1,7 +1,9 @@
 #ifndef PATH_H
 #define PATH_H
 
+#include <array>
 #include "Trade.hpp"
+#include <vector>
 
 namespace Path {
 	static inline constexpr double UNIT = 1e-6;
@@ -63,6 +65,51 @@ namespace Path {
 		}
 
 		return items;
+	}
+
+	static inline double fitness(const double *inventory) noexcept {
+		return inventory[Items::minecraft::emerald];
+	}
+
+	static std::pair<std::vector<size_t>, double> *find(const double *inventory, std::array<bool, Trade::trades>& array) {
+		double amount = fitness(inventory);
+		if (amount > 0.0) {
+			return new std::pair<std::vector<size_t>, double>(std::vector<size_t>(), amount);
+		}
+
+		amount = 0.0;
+		std::pair<std::vector<size_t>, double> *max = (std::pair<std::vector<size_t>, double> *) nullptr;
+		for (size_t i = 0; i < Trade::trades; ++i) {
+			if (!array[i] && good(inventory, &amount, i)) {
+				const double *next = on(inventory, amount, i);
+				if (good(inventory, next)) {
+					array[i] = true;
+					std::pair<std::vector<size_t>, double> *pair = find(next, array);
+					array[i] = false;
+					delete[] next;
+
+					pair->first.push_back(i);
+					if (max) {
+						if (pair->second > max->second) {
+							delete max;
+							max = pair;
+						} else {
+							delete pair;
+						}
+					} else {
+						max = pair;
+					}
+				} else {
+					delete[] next;
+				}
+			}
+		}
+
+		if (max) {
+			return max;
+		} else {
+			return new std::pair<std::vector<size_t>, double>(std::vector<size_t>(), 0.0);
+		}
 	}
 } // namespace Path
 
