@@ -2,6 +2,8 @@
 #define PATH_H
 
 #include <array>
+#include <map>
+#include <set>
 #include "Trade.hpp"
 #include <vector>
 
