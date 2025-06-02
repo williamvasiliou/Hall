@@ -1,5 +1,6 @@
 #include <algorithm>
 #include "Config.hpp"
+#include "Path.hpp"
 #include "Trades.hpp"
 
 namespace Trade {
