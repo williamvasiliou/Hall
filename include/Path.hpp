@@ -113,6 +113,18 @@ namespace Path {
 			return new std::pair<std::vector<size_t>, double>(std::vector<size_t>(), 0.0);
 		}
 	}
+
+	static inline bool find(const std::set<size_t>& wants, const std::set<size_t>& items, size_t item) noexcept {
+		if (wants.find(item) != wants.end()) {
+			return true;
+		}
+
+		if (items.find(item) != items.end()) {
+			return true;
+		}
+
+		return false;
+	}
 } // namespace Path
 
 #endif // PATH_H
