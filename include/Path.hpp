@@ -125,6 +125,77 @@ namespace Path {
 
 		return false;
 	}
+
+	static void find(const std::set<size_t>& wants, std::set<size_t>& items, std::map<size_t, std::set<size_t>>& weights, std::set<size_t>& weight, size_t item) {
+		items.insert(item);
+
+		const size_t index = Items::sum::index[item];
+		const size_t next = Items::sum::next[item];
+		std::set<size_t> in;
+		std::set<size_t> out;
+
+		for (size_t i = index; i < next; ++i) {
+			const double value = Items::sum::quantity[i];
+
+			if (value > 0.0) {
+				in.insert(Items::sum::item[i]);
+			} else if (value < 0.0) {
+				out.insert(Items::sum::item[i]);
+			}
+		}
+
+		for (const auto& trade : out) {
+			if (weight.find(trade) != weight.end()) {
+				continue;
+			}
+
+			bool out = false;
+			const size_t index = Trade::sum::index[trade];
+			const size_t next = Trade::sum::next[trade];
+			for (size_t i = index; i < next; ++i) {
+				const size_t first = Trade::sum::item[i];
+				if (first == item) {
+					continue;
+				}
+
+				if (find(wants, items, first)) {
+					const double second = Trade::sum::quantity[i];
+					if (second > 0.0) {
+						out = true;
+					} else if (second < 0.0 && (
+						weights.find(trade) == weights.end() ||
+						weights[trade].find(first) == weights[trade].end()
+					)) {
+						out = false;
+						break;
+					}
+				}
+			}
+
+			if (out) {
+				weights[trade].insert(item);
+			} else {
+				weight.insert(trade);
+			}
+		}
+
+		for (const auto& trade : in) {
+			if (weight.find(trade) != weight.end()) {
+				continue;
+			}
+
+			const size_t index = Trade::in::index[trade];
+			const size_t next = Trade::in::next[trade];
+			for (size_t i = index; i < next; ++i) {
+				const size_t item = Trade::in::item[i];
+				weights[trade].insert(item);
+
+				if (items.find(item) == items.end()) {
+					find(wants, items, weights, weight, item);
+				}
+			}
+		}
+	}
 } // namespace Path
 
 #endif // PATH_H
