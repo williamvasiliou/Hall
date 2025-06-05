@@ -92,7 +92,10 @@ namespace Path {
 
 					pair->first.push_back(i);
 					if (max) {
-						if (pair->second > max->second) {
+						if (pair->second > max->second || (
+							pair->second == max->second &&
+							pair->first.size() < max->first.size()
+						)) {
 							delete max;
 							max = pair;
 						} else {
@@ -176,6 +179,42 @@ namespace Path {
 				weights[trade].insert(item);
 			} else {
 				weight.insert(trade);
+			}
+		}
+
+		for (const auto& trade : in) {
+			if (weight.find(trade) != weight.end()) {
+				continue;
+			}
+
+			const size_t index = Trade::in::index[trade];
+			const size_t next = Trade::in::next[trade];
+			for (size_t i = index; i < next; ++i) {
+				const size_t item = Trade::in::item[i];
+				weights[trade].insert(item);
+
+				if (items.find(item) == items.end()) {
+					find(wants, items, weights, weight, item);
+				}
+			}
+		}
+	}
+
+	static void find(const std::set<size_t>& wants, std::set<size_t>& items, std::map<size_t, std::set<size_t>>& weights, std::set<size_t>& weight) {
+		std::set<size_t> in;
+
+		for (const auto& item : wants) {
+			const size_t index = Items::sum::index[item];
+			const size_t next = Items::sum::next[item];
+
+			for (size_t i = index; i < next; ++i) {
+				const double value = Items::sum::quantity[i];
+
+				if (value > 0.0) {
+					in.insert(Items::sum::item[i]);
+				} else if (value < 0.0) {
+					weight.insert(Items::sum::item[i]);
+				}
 			}
 		}
 
