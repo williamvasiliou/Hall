@@ -1,10 +1,13 @@
 #ifndef WEIGHTS_H
 #define WEIGHTS_H
 
+#include <array>
 #include <iostream>
 #include "Items.hpp"
+#include <map>
 #include "Parameters.hpp"
 #include <random>
+#include <set>
 
 namespace Config {
 	class Population;
@@ -49,6 +52,7 @@ class Weights {
 		static inline constexpr double UNIT = 1e-6;
 		void fill() noexcept;
 		static void fill(double *weights) noexcept;
+		static void fill(double *child, const std::map<size_t, std::set<size_t>>& weights) noexcept;
 		void fill(double *child, const double *weights) const noexcept;
 		void fill(double *child, const double *weights, size_t i) const noexcept;
 

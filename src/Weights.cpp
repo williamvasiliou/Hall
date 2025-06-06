@@ -45,6 +45,30 @@ void Weights::fill(double *weights) noexcept {
 	}
 }
 
+void Weights::fill(double *child, const std::map<size_t, std::set<size_t>>& weights) noexcept {
+	std::map<size_t, size_t> size;
+	std::array<double, Items::size> items;
+
+	for (const auto& pair : weights) {
+		for (const auto& item : pair.second) {
+			++size[item];
+		}
+	}
+
+	for (const auto& pair : size) {
+		items[pair.first] = dis(gen) / pair.second;
+	}
+
+	for (size_t i = 0; i < Trade::trades; ++i) {
+		size_t index = Trade::in::index[i];
+		const size_t next = Trade::in::next[i];
+		child[index] = items[Trade::in::item[index]];
+		while (++index < next) {
+			child[index] = items[Trade::in::item[index]];
+		}
+	}
+}
+
 void Weights::fill(double *child, const double *weights) const noexcept {
 	const double value = dis(gen);
 	const double amount = dis(gen);
@@ -102,7 +126,7 @@ void Weights::fill(double *child, const double *weights) const noexcept {
 			}
 		}
 
-		Weights::mutate(child, index, next);
+		this->mutate(child, index, next);
 	}
 }
 
