@@ -112,6 +112,7 @@ class Options {
 		static const Options *parse(std::set<std::string>& directories, std::string& file, bool& verbose, int argc, char **argv);
 
 		Option<double> bottom;
+		Option<std::string> find;
 		Option<double> mutate;
 		Option<double> top;
 		Option<size_t> trade;

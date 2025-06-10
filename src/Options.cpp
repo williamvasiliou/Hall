@@ -11,6 +11,7 @@ Option<T>::~Option() {}
 
 Options::Options() :
 	bottom(0.0),
+	find(""),
 	mutate(0.0),
 	top(0.0),
 	trade(0),
@@ -43,6 +44,12 @@ const Options *Options::parse(std::set<std::string>& directories, std::string& f
 					}
 				} else if (string.substr(0, 7) == "--file=") {
 					file = string.substr(7);
+				} else if (string == "--find") {
+					if (++i < argc) {
+						options->find = std::string(argv[i]);
+					}
+				} else if (string.substr(0, 7) == "--find=") {
+					options->find = string.substr(7);
 				} else if (string == "--help") {
 					Options::usage(std::cout);
 					delete options;

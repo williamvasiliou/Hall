@@ -177,7 +177,30 @@ inline bool train(const std::string& file, const Options& options, bool verbose)
 		if (verbose) {
 			Config::print(std::cout, *inventory, *parameters, *weights);
 		}
-		train(*inventory, *parameters, *weights, verbose);
+
+		if (options.find) {
+			double *items = new double[Items::size];
+			for (size_t i = 0; i < Items::size; ++i) {
+				items[i] = (*inventory)[i];
+			}
+
+			std::array<bool, Trade::trades> array;
+			std::pair<std::vector<size_t>, double> *pair = Path::find(items, array);
+			if (pair) {
+				const size_t size = pair->first.size();
+				std::cout << size << ": " << pair->second << std::endl;
+
+				for (size_t i = 0; i < size; ++i) {
+					std::cout << pair->first[i] << std::endl;
+					Trade::print(std::cout, pair->first[i]);
+				}
+				delete pair;
+			}
+
+			delete[] items;
+		} else {
+			train(*inventory, *parameters, *weights, verbose);
+		}
 
 		delete inventory;
 		delete parameters;
