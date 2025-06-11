@@ -3,6 +3,30 @@
 #include "Path.hpp"
 #include "Trades.hpp"
 
+namespace Items {
+	static inline ssize_t find(const std::string& name) {
+		ssize_t first = 0;
+		ssize_t second = Items::size - 1;
+		while (first < second) {
+			const ssize_t index = first / 2 + second / 2;
+			const std::string& value = Items::item[index].name;
+			if (value < name) {
+				first = index + 1;
+			} else if (value > name) {
+				second = index - 1;
+			} else {
+				return index;
+			}
+		}
+
+		if (first == second && Items::item[first].name == name) {
+			return first;
+		}
+
+		return -1;
+	}
+} // namespace Items
+
 namespace Trade {
 	static inline constexpr double UNIT = 1e-6;
 	static inline void on(Inventory& inventory, const double *weight, size_t trade) noexcept {
@@ -179,9 +203,10 @@ inline bool train(const std::string& file, const Options& options, bool verbose)
 		}
 
 		if (options.find) {
+			const Inventory& in = *inventory;
 			double *items = new double[Items::size];
 			for (size_t i = 0; i < Items::size; ++i) {
-				items[i] = (*inventory)[i];
+				items[i] = in[i];
 			}
 
 			std::array<bool, Trade::trades> array;
@@ -244,12 +269,26 @@ inline bool good(const std::set<std::string>& directories, const std::string& fi
 		Document.close();
 
 		return true;
-	} else if (file.size() > 0) {
-		if (train(file, options, verbose)) {
-			return true;
-		} else {
-			return false;
+	} else if (options.rfind) {
+		std::set<size_t> wants;
+		std::set<size_t> items;
+		std::map<size_t, std::set<size_t>> weights;
+		std::set<size_t> weight;
+
+		const ssize_t item = Items::find(options.rfind(""));
+		if (item >= 0) {
+			wants.insert((size_t) item);
 		}
+
+		Path::find(wants, items, weights, weight);
+		for (const auto& pair : weights) {
+			std::cout << pair.first << std::endl;
+			Trade::print(std::cout, pair.first);
+		}
+
+		return true;
+	} else if (file.size() > 0) {
+		return train(file, options, verbose);
 	} else {
 		return false;
 	}

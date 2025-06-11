@@ -114,6 +114,7 @@ class Options {
 		Option<double> bottom;
 		Option<std::string> find;
 		Option<double> mutate;
+		Option<std::string> rfind;
 		Option<double> top;
 		Option<size_t> trade;
 		Option<size_t> train;

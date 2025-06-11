@@ -13,6 +13,7 @@ Options::Options() :
 	bottom(0.0),
 	find(""),
 	mutate(0.0),
+	rfind(""),
 	top(0.0),
 	trade(0),
 	train(0)
@@ -64,6 +65,12 @@ const Options *Options::parse(std::set<std::string>& directories, std::string& f
 					}
 				} else if (string.substr(0, 9) == "--mutate=") {
 					options->mutate = argv[i] + 9;
+				} else if (string == "--rfind") {
+					if (++i < argc) {
+						options->rfind = std::string(argv[i]);
+					}
+				} else if (string.substr(0, 8) == "--rfind=") {
+					options->rfind = string.substr(8);
 				} else if (string == "--top") {
 					if (++i < argc) {
 						options->top = argv[i];
