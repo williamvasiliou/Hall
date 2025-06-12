@@ -210,7 +210,15 @@ inline bool train(const std::string& file, const Options& options, bool verbose)
 			}
 
 			std::array<bool, Trade::trades> array;
-			std::pair<std::vector<size_t>, double> *pair = Path::find(items, array);
+			std::pair<std::vector<size_t>, double> *pair = (std::pair<std::vector<size_t>, double> *) nullptr;
+			const ssize_t item = Items::find(options.find(""));
+
+			if (item >= 0) {
+				pair = Path::find(items, array, (size_t) item);
+			} else {
+				pair = Path::find(items, array);
+			}
+
 			if (pair) {
 				const size_t size = pair->first.size();
 				std::cout << size << ": " << pair->second << std::endl;

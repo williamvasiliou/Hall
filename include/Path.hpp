@@ -117,6 +117,50 @@ namespace Path {
 		}
 	}
 
+	static std::pair<std::vector<size_t>, double> *find(const double *inventory, std::array<bool, Trade::trades>& array, size_t item) {
+		double amount = inventory[item];
+		if (amount > 0.0) {
+			return new std::pair<std::vector<size_t>, double>(std::vector<size_t>(), amount);
+		}
+
+		amount = 0.0;
+		std::pair<std::vector<size_t>, double> *max = (std::pair<std::vector<size_t>, double> *) nullptr;
+		for (size_t i = 0; i < Trade::trades; ++i) {
+			if (!array[i] && good(inventory, &amount, i)) {
+				const double *next = on(inventory, amount, i);
+				if (good(inventory, next)) {
+					array[i] = true;
+					std::pair<std::vector<size_t>, double> *pair = find(next, array, item);
+					array[i] = false;
+					delete[] next;
+
+					pair->first.push_back(i);
+					if (max) {
+						if (pair->second > max->second || (
+							pair->second == max->second &&
+							pair->first.size() < max->first.size()
+						)) {
+							delete max;
+							max = pair;
+						} else {
+							delete pair;
+						}
+					} else {
+						max = pair;
+					}
+				} else {
+					delete[] next;
+				}
+			}
+		}
+
+		if (max) {
+			return max;
+		} else {
+			return new std::pair<std::vector<size_t>, double>(std::vector<size_t>(), 0.0);
+		}
+	}
+
 	static inline bool find(const std::set<size_t>& wants, const std::set<size_t>& items, size_t item) noexcept {
 		if (wants.find(item) != wants.end()) {
 			return true;
