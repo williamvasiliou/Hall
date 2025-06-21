@@ -42,5 +42,17 @@ Number of training iterations.
 
 Optional array for seed population.
 
+## Get Started
 
+Prerequisites:
 
+- G++
+- GNU Make
+
+To set up the app, execute the following commands:
+
+```bash
+git clone https://github.com/williamvasiliou/Hall.git
+cd Hall
+make
+```
